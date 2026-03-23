@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Ghana GHG Emissions Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+  </head>
+
+  <body>
+    <div class="container">
+      <!-- LEFT PANEL -->
+      <div class="sidebar">
+        <h2>Ghana GHG Emissions</h2>
+        <p>Regional greenhouse gas emissions (tCO₂e)</p>
+
+        <div id="legend"></div>
+      </div>
+
+      <!-- MAP -->
+      <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./main.js"></script>
+  </body>
+</html>
