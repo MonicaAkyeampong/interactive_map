@@ -27,7 +27,7 @@ export default function Home() {
         <div className="w-1/2 pr-16">
           <h2 className="text-6xl font-bold leading-[1.1] mb-6 tracking-tight">
             GREENHOUSE<br />
-            GASES EMISSIONS<br />
+            GAS EMISSIONS<br />
             MAP
           </h2>
           <h3 className="text-xl mb-6 text-gray-700 font-medium">
