@@ -26,9 +26,9 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-10 pt-20 pb-32 flex items-center min-h-[calc(100vh-100px)] relative z-10">
         <div className="w-1/2 pr-16">
           <h2 className="text-6xl font-bold leading-[1.1] mb-6 tracking-tight">
-            GREENHOUSE<br />
-            GAS EMISSIONS<br />
-            MAP
+            GHG<br />
+            EMISSIONS<br />
+            MAP OF GHANA
           </h2>
           <h3 className="text-xl mb-6 text-gray-700 font-medium">
             Interactive Map for Greenhouse Gas Emissions in Ghana
