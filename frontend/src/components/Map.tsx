@@ -9,13 +9,13 @@ import { useStore } from '@/store/useStore';
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 const GAS_COLORS: Record<string, string> = {
-  CO2: '#14532d', // green-900
-  N2O: '#166534', // green-800
-  CH4: '#15803d', // green-700
-  SF6: '#16a34a', // green-600
-  CFC: '#22c55e', // green-500
-  PFC: '#4ade80', // green-400
-  HFC: '#86efac'  // green-300
+  CO2: '#5C0000', // green-900
+  N2O: '#8B0000', // green-800
+  CH4: '#B22222', // green-700
+  SF6: '#D32F2F', // green-600
+  CFC: '#E57373', // green-500
+  PFC: '#F28B82', // green-400
+  HFC: '#FFCDD2'  // green-300
 };
 
 export default function Map() {
