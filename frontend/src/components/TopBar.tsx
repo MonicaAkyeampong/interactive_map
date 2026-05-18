@@ -13,7 +13,7 @@ export default function TopBar() {
   return (
     <div className="absolute top-4 left-4 right-4 flex items-center justify-between p-4 bg-white rounded-lg shadow-md z-20">
       <div className="flex items-center space-x-8">
-        <h1 className="text-xl font-bold tracking-tight">LOGO</h1>
+        <h1 className="text-xl font-bold tracking-tight text-green-600">LOGO</h1>
         
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />

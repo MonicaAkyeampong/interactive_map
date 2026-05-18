@@ -9,13 +9,13 @@ import { useStore } from '@/store/useStore';
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 const GAS_COLORS: Record<string, string> = {
-  CO2: '#ef4444',
-  N2O: '#3b82f6',
-  CH4: '#22c55e',
-  SF6: '#a855f7',
-  CFC: '#eab308',
-  PFC: '#f97316',
-  HFC: '#ec4899'
+  CO2: '#14532d', // green-900
+  N2O: '#166534', // green-800
+  CH4: '#15803d', // green-700
+  SF6: '#16a34a', // green-600
+  CFC: '#22c55e', // green-500
+  PFC: '#4ade80', // green-400
+  HFC: '#86efac'  // green-300
 };
 
 export default function Map() {
@@ -75,20 +75,20 @@ export default function Map() {
             'interpolate',
             ['linear'],
             ['get', gas],
-            0, '#ffeda0',
-            50, '#f03b20',
-            100, '#bd0026'
+            0, '#dcfce7',
+            50, '#22c55e',
+            100, '#14532d'
           ],
       'fill-opacity': 0.7
     }
   };
 
   return (
-    <div className="absolute inset-0 bg-gray-900">
+    <div className="absolute inset-0 bg-transparent">
       {!MAPBOX_TOKEN ? (
-        <div className="flex items-center justify-center h-full w-full flex-col text-white z-50 absolute inset-0 bg-gray-900/80">
-          <h2 className="text-2xl font-bold mb-2">Mapbox Token Required</h2>
-          <p className="text-gray-300 max-w-md text-center">
+        <div className="flex items-center justify-center h-full w-full flex-col text-gray-900 z-50 absolute inset-0 bg-white/90 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold mb-2 text-green-700">Mapbox Token Required</h2>
+          <p className="text-gray-600 max-w-md text-center">
             Please add your Mapbox API token to <code>.env.local</code> as <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to view the map.
           </p>
         </div>
@@ -96,7 +96,7 @@ export default function Map() {
       <MapboxMap
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
-        mapStyle="mapbox://styles/mapbox/dark-v11"
+        mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
       >
@@ -159,7 +159,7 @@ export default function Map() {
               </div>
             ) : (
               <div className="flex flex-col space-y-1 mt-1">
-                <div className="h-3 w-full rounded bg-gradient-to-r from-[#ffeda0] via-[#f03b20] to-[#bd0026]"></div>
+                <div className="h-3 w-full rounded bg-gradient-to-r from-[#dcfce7] via-[#22c55e] to-[#14532d]"></div>
                 <div className="flex justify-between text-xs text-gray-500">
                   <span>Low</span>
                   <span>High</span>
@@ -172,18 +172,18 @@ export default function Map() {
       
       {/* Timeline Placeholder */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-[600px] z-10">
-        <div className="flex items-center space-x-2 text-xs text-white">
-          <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">Mar</div>
-          <div className="flex-1 h-px bg-gray-500"></div>
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">Apr</div>
-          <div className="flex-1 h-px bg-gray-500"></div>
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">May</div>
-          <div className="flex-1 h-px bg-gray-500"></div>
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">Jun</div>
-          <div className="flex-1 h-px bg-gray-500"></div>
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">Jul</div>
-          <div className="flex-1 h-px bg-gray-500"></div>
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">Aug</div>
+        <div className="flex items-center space-x-2 text-xs text-gray-800 font-medium">
+          <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm">Mar</div>
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center shadow-sm">Apr</div>
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center shadow-sm">May</div>
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center shadow-sm">Jun</div>
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center shadow-sm">Jul</div>
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center shadow-sm">Aug</div>
         </div>
       </div>
     </div>

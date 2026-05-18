@@ -4,7 +4,7 @@ import TopBar from '@/components/TopBar';
 
 export default function Dashboard() {
   return (
-    <div className="h-screen w-screen overflow-hidden relative font-sans bg-gray-900">
+    <div className="h-screen w-screen overflow-hidden relative font-sans bg-[#F5F7F5]">
       <Map />
       <TopBar />
       <Sidebar />
