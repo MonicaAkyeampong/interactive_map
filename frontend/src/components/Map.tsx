@@ -75,9 +75,9 @@ export default function Map() {
             'interpolate',
             ['linear'],
             ['get', gas],
-            0, '#dcfce7',
-            50, '#22c55e',
-            100, '#14532d'
+            0, '#FFCDD2',
+            50, '#D32F2F',
+            100, '#5C0000'
           ],
       'fill-opacity': 0.7
     }
