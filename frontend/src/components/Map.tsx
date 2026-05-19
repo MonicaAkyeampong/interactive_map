@@ -37,11 +37,11 @@ export default function Map() {
     let intervalId: NodeJS.Timeout;
     if (isPlaying) {
       intervalId = setInterval(() => {
-        setActiveTimelineIndex((prev) => (prev + 1) % intervals.length);
+        setActiveTimelineIndex((activeTimelineIndex + 1) % intervals.length);
       }, 2000);
     }
     return () => clearInterval(intervalId);
-  }, [isPlaying, setActiveTimelineIndex, intervals.length]);
+  }, [isPlaying, setActiveTimelineIndex, intervals.length, activeTimelineIndex]);
 
   useEffect(() => {
     fetch('/ghana.geojson')
@@ -171,7 +171,7 @@ export default function Map() {
       </MapboxMap>
       
       {/* Zoom Controls (Bottom Right) */}
-      <div className="absolute right-4 bottom-24 flex flex-col gap-2 z-10">
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
         <button 
           className="bg-white text-black p-2 rounded shadow hover:bg-gray-100"
           onClick={() => setViewState(prev => ({ ...prev, zoom: prev.zoom + 1 }))}

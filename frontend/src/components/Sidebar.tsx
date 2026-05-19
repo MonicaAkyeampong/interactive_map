@@ -34,7 +34,7 @@ export default function Sidebar() {
   const forecastText = `${forecastMode || 'Future Forecasts'} (${intervals[activeTimelineIndex]})`;
 
   return (
-    <div className="absolute top-20 left-4 z-10 w-72 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
+    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-10 w-72 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
       <div className="mb-1">
         <h2 className="text-xs font-medium text-gray-500">{scopeText}</h2>
         <p className="text-[10px] text-green-600 font-semibold mt-0.5">{forecastText}</p>
