@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import Image from 'next/image';
+import logo from '@/assets/logo.png';
 
 export default function Home() {
   return (
@@ -10,7 +12,9 @@ export default function Home() {
       {/* Navbar */}
       <nav className="flex items-center justify-between px-10 py-6 max-w-7xl mx-auto relative z-10">
         <div className="flex items-center">
-          <h1 className="text-3xl font-bold tracking-tighter text-green-600">LOGO</h1>
+          <Link href="/">
+            <Image src={logo} alt="Logo" className="h-10 w-auto" />
+          </Link>
         </div>
         <div className="flex items-center space-x-8 text-sm font-medium">
           <Link href="/dashboard" className="hover:text-green-600 transition-colors">Map</Link>
