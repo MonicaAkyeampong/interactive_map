@@ -1,26 +1,68 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --ncel-primary: #1DB978;
+  --ncel-primary-dark: #159b63;
+  --ncel-slate: #0F172A;
+  --ncel-surface: #FFFFFF;
+  --ncel-muted: #64748B;
+  --ncel-border: #E2E8F0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-brand-50: #e8f8f1;
+  --color-brand-100: #bbf0d8;
+  --color-brand-400: #42d198;
+  --color-brand-500: var(--ncel-primary);
+  --color-brand-600: var(--ncel-primary-dark);
+  --color-brand-700: #0f7a4e;
+  --font-sans: var(--font-outfit);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #F1F5F9; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* Custom Mapbox Popup Close Button */
+.mapboxgl-popup-close-button {
+  font-size: 18px !important;
+  color: #64748B !important;
+  background-color: #F1F5F9 !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  right: 6px !important;
+  top: 6px !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  transition: all 0.2s ease !important;
+  z-index: 10 !important;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+.mapboxgl-popup-close-button:focus {
+  outline: none !important;
 }

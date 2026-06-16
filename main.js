@@ -13,18 +13,18 @@
       // Function to assign colors based on emission values
       function getColor(d) {
         return d > 8000
-          ? "#800026" // very high
+          ? "#800026" // very high (deep red)
           : d > 6000
-            ? "#BD0026"
+            ? "#E31A1C" // high (red)
             : d > 4000
-              ? "#E31A1C"
+              ? "#FC4E2A" // moderate-high (orange-red)
               : d > 3000
-                ? "#FC4E2A"
+                ? "#FD8D3C" // moderate (orange)
                 : d > 2000
-                  ? "#FD8D3C"
+                  ? "#FEB24C" // low-moderate (yellow-orange)
                   : d > 1000
-                    ? "#FEB24C"
-                    : "#FFEDA0"; // very low
+                    ? "#FFEDA0" // low (pale yellow)
+                    : "#31A354"; // very low (green)
       }
 
       // ------------------ STYLE FUNCTION ------------------

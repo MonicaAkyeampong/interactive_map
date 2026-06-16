@@ -8,6 +8,8 @@ interface FilterState {
   mapMode: 'Intensity' | 'DominantGas';
   activeTimelineIndex: number;
   isPlaying: boolean;
+  selectedRegion: string | null;
+  searchedRegion: string | null;
   setYear: (year: number | null) => void;
   setGas: (gas: string | null) => void;
   setSector: (sector: string | null) => void;
@@ -15,6 +17,8 @@ interface FilterState {
   setMapMode: (mode: 'Intensity' | 'DominantGas') => void;
   setActiveTimelineIndex: (index: number) => void;
   setIsPlaying: (isPlaying: boolean) => void;
+  setSelectedRegion: (region: string | null) => void;
+  setSearchedRegion: (region: string | null) => void;
 }
 
 export const useStore = create<FilterState>((set) => ({
@@ -25,6 +29,8 @@ export const useStore = create<FilterState>((set) => ({
   mapMode: 'Intensity', // default
   activeTimelineIndex: 0,
   isPlaying: false,
+  selectedRegion: null,
+  searchedRegion: null,
   setYear: (year) => set({ year }),
   setGas: (gas) => set({ gas }),
   setSector: (sector) => set({ sector }),
@@ -32,4 +38,6 @@ export const useStore = create<FilterState>((set) => ({
   setMapMode: (mode) => set({ mapMode: mode }),
   setActiveTimelineIndex: (index) => set({ activeTimelineIndex: index }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
+  setSelectedRegion: (region) => set({ selectedRegion: region }),
+  setSearchedRegion: (region) => set({ searchedRegion: region }),
 }));

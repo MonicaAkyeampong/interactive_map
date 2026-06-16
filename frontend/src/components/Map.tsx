@@ -4,285 +4,432 @@ import { useState, useEffect, useCallback } from 'react';
 import MapboxMap, { Source, Layer, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useStore } from '@/store/useStore';
-import { Play, Pause } from 'lucide-react';
+import { fetchMapData } from '@/lib/api';
+import { Play, Pause, Plus, Minus, Layers, ChevronDown, HelpCircle, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import HoverRegionDetails from './RegionPanel';
 
-// Mapbox Token (Provide your token in .env.local as NEXT_PUBLIC_MAPBOX_TOKEN)
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 const GAS_COLORS: Record<string, string> = {
-  CO2: '#3b82f6', // blue
-  N2O: '#a855f7', // purple
-  CH4: '#f97316', // orange
-  SF6: '#eab308', // yellow
-  CFC: '#06b6d4', // cyan
-  PFC: '#f43f5e', // rose
-  HFC: '#84cc16'  // lime
+  CO2: '#3b82f6',
+  N2O: '#a855f7',
+  CH4: '#f97316',
+  SF6: '#eab308',
+  CFC: '#06b6d4',
+  PFC: '#f43f5e',
+  HFC: '#84cc16',
+};
+
+const GAS_LABELS: Record<string, string> = {
+  CO2: 'Carbon Dioxide',
+  N2O: 'Nitrous Oxide',
+  CH4: 'Methane',
+  SF6: 'Sulfur Hexafluoride',
+  CFC: 'Chlorofluorocarbon',
+  PFC: 'Perfluorocarbon',
+  HFC: 'Hydrofluorocarbon',
 };
 
 export default function Map() {
-  const { year, gas, sector, activeTimelineIndex, isPlaying, setActiveTimelineIndex, setIsPlaying, mapMode, setMapMode, forecastMode, setForecastMode } = useStore();
+  const {
+    year, gas, sector, activeTimelineIndex, isPlaying,
+    setActiveTimelineIndex, setIsPlaying, mapMode, setMapMode,
+    forecastMode, setForecastMode, searchedRegion, setSearchedRegion
+  } = useStore();
+
   const [geoData, setGeoData] = useState<any>(null);
   const [isLegendOpen, setIsLegendOpen] = useState(true);
-  const [hoverInfo, setHoverInfo] = useState<{feature: any, longitude: number, latitude: number} | null>(null);
-  
-  const intervals = ["24hrs", "48hrs", "72hrs", "1 week", "1 month"];
-  
+  const [isHowToOpen, setIsHowToOpen] = useState(false);
+  const [clickedRegionInfo, setClickedRegionInfo] = useState<{ feature: any; longitude: number; latitude: number } | null>(null);
+
+  const intervals = ['24hrs', '48hrs', '72hrs', '1 week', '1 month'];
+
   const [viewState, setViewState] = useState({
-    longitude: -1.0232, // Center of Ghana
+    longitude: -1.0232,
     latitude: 7.9465,
-    zoom: 5.5
+    zoom: 5.5,
   });
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let id: NodeJS.Timeout;
     if (isPlaying) {
-      intervalId = setInterval(() => {
+      id = setInterval(() => {
         setActiveTimelineIndex((activeTimelineIndex + 1) % intervals.length);
       }, 2000);
     }
-    return () => clearInterval(intervalId);
+    return () => clearInterval(id);
   }, [isPlaying, setActiveTimelineIndex, intervals.length, activeTimelineIndex]);
 
   useEffect(() => {
-    fetch('/ghana.geojson')
-      .then(res => res.json())
-      .then(data => {
-        // Inject dummy data for demonstration purposes
-        const gases = Object.keys(GAS_COLORS);
+    if (!searchedRegion || !geoData) return;
+    
+    const feature = geoData.features.find((f: any) => 
+      (f.properties.REGION || f.properties.name || '').toLowerCase() === searchedRegion.toLowerCase()
+    );
+    
+    if (feature) {
+      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+      const coords = feature.geometry.type === 'MultiPolygon' 
+        ? feature.geometry.coordinates.flat(2) 
+        : feature.geometry.coordinates.flat(1);
         
-        data.features.forEach((f: any) => {
-          let maxVal = -1;
-          let domGas = gases[0];
-          
-          gases.forEach((g) => {
-            const val = Math.floor(Math.random() * 100);
-            f.properties[g] = val;
-            if (val > maxVal) {
-              maxVal = val;
-              domGas = g;
-            }
-          });
-          f.properties.dominant_gas = domGas;
-        });
-        setGeoData(data);
+      coords.forEach(([lng, lat]: number[]) => {
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
       });
-  }, []);
+      
+      const centerLng = (minLng + maxLng) / 2;
+      const centerLat = (minLat + maxLat) / 2;
+      
+      setViewState(prev => ({
+        ...prev,
+        longitude: centerLng,
+        latitude: centerLat,
+        zoom: 7.5,
+        transitionDuration: 1500
+      }));
+      
+      setClickedRegionInfo({ feature, longitude: centerLng, latitude: centerLat });
+      setSearchedRegion(null);
+    }
+  }, [searchedRegion, geoData, setSearchedRegion]);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const [geoRes, mapData] = await Promise.all([
+          fetch('/ghana.geojson').then(r => r.json()),
+          fetchMapData(y, sector || undefined),
+        ]);
+
+        const mapDataLower = Object.fromEntries(
+          Object.entries(mapData).map(([k, v]) => [k.toLowerCase(), v])
+        );
+
+        geoRes.features.forEach((f: any) => {
+          const name = (f.properties.REGION || f.properties.name || '').toLowerCase();
+          const bd = mapDataLower[name] || {};
+          Object.keys(GAS_COLORS).forEach(g => {
+            f.properties[g] = bd[g] ? bd[g] : 0;
+          });
+          f.properties.dominant_gas = bd.dominant_gas !== 'None' ? bd.dominant_gas : 'CO2';
+        });
+
+        setGeoData(geoRes);
+      } catch (err) {
+        console.error('Failed to load map data', err);
+      }
+    }
+    loadData();
+  }, [year, sector]);
 
   const fillStyle: any = {
     id: 'regions-fill',
     type: 'fill',
     paint: {
-      'fill-color': mapMode === 'DominantGas'
-        ? [
-            'match',
-            ['get', 'dominant_gas'],
-            'CO2', GAS_COLORS.CO2,
-            'N2O', GAS_COLORS.N2O,
-            'CH4', GAS_COLORS.CH4,
-            'SF6', GAS_COLORS.SF6,
-            'CFC', GAS_COLORS.CFC,
-            'PFC', GAS_COLORS.PFC,
-            'HFC', GAS_COLORS.HFC,
-            '#cccccc'
-          ]
-        : [
-            'interpolate',
-            ['linear'],
-            ['get', gas || 'CO2'], // Proxy if All Gases is selected
-            0, '#fef08a',
-            50, '#f97316',
-            100, '#991b1b'
-          ],
-      'fill-opacity': 0.7
-    }
+      'fill-color': ['interpolate', ['linear'], ['get', gas || 'CO2'],
+        0, '#31A354',      // Very low: green
+        2000, '#FFEDA0',   // Low: pale yellow
+        4000, '#FD8D3C',   // Moderate: orange
+        8000, '#E31A1C',   // High: red
+        20000, '#800026'], // Very high: deep red
+      'fill-opacity': 0.72,
+    },
   };
 
-  const onHover = useCallback((event: any) => {
-    const { features, lngLat } = event;
-    const hoveredFeature = features && features[0];
+  const lineStyle: any = {
+    id: 'regions-line',
+    type: 'line',
+    paint: {
+      'line-color': '#ffffff',
+      'line-opacity': 0.6,
+      'line-width': 1,
+    },
+  };
 
-    if (hoveredFeature) {
-      setHoverInfo({
-        feature: hoveredFeature,
-        longitude: lngLat.lng,
-        latitude: lngLat.lat
-      });
+  const onClick = useCallback((event: any) => {
+    const { features, lngLat } = event;
+    const f = features?.[0];
+    if (f) {
+      setClickedRegionInfo({ feature: f, longitude: lngLat.lng, latitude: lngLat.lat });
     } else {
-      setHoverInfo(null);
+      setClickedRegionInfo(null);
     }
   }, []);
 
-  return (
-    <div className="absolute inset-0 bg-transparent">
-      {!MAPBOX_TOKEN ? (
-        <div className="flex items-center justify-center h-full w-full flex-col text-gray-900 z-50 absolute inset-0 bg-white/90 backdrop-blur-sm">
-          <h2 className="text-2xl font-bold mb-2 text-green-700">Mapbox Token Required</h2>
-          <p className="text-gray-600 max-w-md text-center">
-            Please add your Mapbox API token to <code>.env.local</code> as <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to view the map.
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-gray-50 flex-col gap-4 z-50">
+        <div className="w-14 h-14 rounded-2xl bg-brand-100 flex items-center justify-center border border-brand-200">
+          <Layers className="w-6 h-6 text-brand-600" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-lg font-bold text-gray-800 mb-1">Mapbox Token Required</h2>
+          <p className="text-sm text-gray-500 max-w-sm">
+            Add your token to <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">.env.local</code> as{' '}
+            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">NEXT_PUBLIC_MAPBOX_TOKEN</code>
           </p>
         </div>
-      ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0">
       <MapboxMap
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
-        onMouseMove={onHover}
-        onMouseLeave={() => setHoverInfo(null)}
+        onClick={onClick}
         interactiveLayerIds={['regions-fill']}
+        cursor="pointer"
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
+        attributionControl={false}
       >
         {geoData && (
           <Source id="ghana-regions" type="geojson" data={geoData}>
             <Layer {...fillStyle} />
-            <Layer 
-              id="regions-line"
-              type="line"
-              paint={{
-                'line-color': '#000',
-                'line-opacity': 0.3,
-                'line-width': 1
-              }}
-            />
+            <Layer {...lineStyle} />
+            {clickedRegionInfo?.feature && (
+              <Layer
+                id="region-highlight"
+                type="line"
+                paint={{
+                  'line-color': '#1DB978',
+                  'line-width': 3,
+                }}
+                filter={['==', ['get', 'REGION'], clickedRegionInfo.feature.properties.REGION]}
+              />
+            )}
           </Source>
         )}
-        
-        {hoverInfo && hoverInfo.feature && (
-          <Popup
-            longitude={hoverInfo.longitude}
-            latitude={hoverInfo.latitude}
-            closeButton={false}
-            closeOnClick={false}
-            anchor="bottom"
-            offset={15}
-            className="z-50"
-          >
-            <div className="p-1 min-w-[120px]">
-              <h3 className="font-bold text-gray-800 border-b border-gray-100 pb-1 mb-1 text-sm">
-                {hoverInfo.feature.properties.REGION || hoverInfo.feature.properties.name || 'Region'}
-              </h3>
-              <div className="text-xs space-y-1 mt-2">
-                <p className="flex justify-between"><span className="text-gray-500">Dominant:</span> <span className="font-semibold text-gray-700">{hoverInfo.feature.properties.dominant_gas}</span></p>
-                <p className="flex justify-between"><span className="text-gray-500">Emission:</span> <span className="font-semibold text-gray-700">{hoverInfo.feature.properties[hoverInfo.feature.properties.dominant_gas] || hoverInfo.feature.properties.CO2} kt</span></p>
-              </div>
-            </div>
-          </Popup>
-        )}
+
+        <AnimatePresence>
+          {clickedRegionInfo?.feature && (
+            <Popup
+              longitude={clickedRegionInfo.longitude}
+              latitude={clickedRegionInfo.latitude}
+              closeButton={true}
+              closeOnClick={false}
+              onClose={() => setClickedRegionInfo(null)}
+              offset={12}
+              className="z-50 !p-0 shadow-xl rounded-xl custom-popup"
+              maxWidth="300px"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 4 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+              >
+                <HoverRegionDetails regionName={clickedRegionInfo.feature.properties.REGION || clickedRegionInfo.feature.properties.name || 'Region'} />
+              </motion.div>
+            </Popup>
+          )}
+        </AnimatePresence>
       </MapboxMap>
-      
-      {/* Zoom Controls (Bottom Right) */}
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
-        <button 
-          className="bg-white text-black p-2 rounded shadow hover:bg-gray-100"
-          onClick={() => setViewState(prev => ({ ...prev, zoom: prev.zoom + 1 }))}
+
+      {/* ── Zoom Controls ── */}
+      <div className="absolute right-6 bottom-6 flex flex-col gap-1.5 z-10">
+        <button
+          onClick={() => setViewState(p => ({ ...p, zoom: Math.min(p.zoom + 1, 18) }))}
+          className="w-9 h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
         >
-          +
+          <Plus className="w-4 h-4" />
         </button>
-        <button 
-          className="bg-white text-black p-2 rounded shadow hover:bg-gray-100"
-          onClick={() => setViewState(prev => ({ ...prev, zoom: prev.zoom - 1 }))}
+        <button
+          onClick={() => setViewState(p => ({ ...p, zoom: Math.max(p.zoom - 1, 1) }))}
+          className="w-9 h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
         >
-          -
+          <Minus className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Legend */}
-      <div className="absolute bottom-6 right-4 z-10 bg-white rounded shadow-lg flex flex-col min-w-[220px] overflow-hidden text-sm">
-        <div 
-          className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 border-b border-gray-100"
-          onClick={() => setIsLegendOpen(!isLegendOpen)}
-        >
-          <span className="font-semibold text-gray-800">Map Legend</span>
-          <span className="text-gray-500 text-xs ml-2">
-            {isLegendOpen ? '▼' : '▲'}
-          </span>
-        </div>
+      {/* ── Legend Container ── */}
+      <div className="absolute bottom-6 right-20 z-10 flex items-end gap-3">
         
-        {isLegendOpen && (
-          <div className="bg-gray-50/50">
-            <div className="px-4 py-2 border-b border-gray-100 flex gap-2">
-              <button 
-                onClick={() => setMapMode('Intensity')}
-                className={`flex-1 py-1 text-xs rounded-md font-medium transition-colors ${mapMode === 'Intensity' ? 'bg-green-100 text-green-700' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-              >
-                Intensity
-              </button>
-              <button 
-                onClick={() => setMapMode('DominantGas')}
-                className={`flex-1 py-1 text-xs rounded-md font-medium transition-colors ${mapMode === 'DominantGas' ? 'bg-green-100 text-green-700' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-              >
-                Dominant Gas
-              </button>
+        {/* How to Use Button */}
+        <button
+          onClick={() => setIsHowToOpen(true)}
+          className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 p-3 hover:bg-gray-50/80 transition-colors flex items-center justify-center h-11"
+          title="How to use the map"
+        >
+          <HelpCircle className="w-5 h-5 text-gray-500 hover:text-brand-600 transition-colors" />
+        </button>
+
+        {/* Legend */}
+        <div className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 overflow-hidden min-w-[200px]">
+          <button
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/80 transition-colors border-b border-gray-50 h-11"
+            onClick={() => setIsLegendOpen(!isLegendOpen)}
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-xs font-semibold text-gray-700">Map Legend</span>
             </div>
-            <div className="px-4 py-3">
-              {mapMode === 'DominantGas' ? (
-                <div className="space-y-2">
-                  {Object.entries(GAS_COLORS).map(([g, color]) => (
-                    <div key={g} className="flex items-center space-x-2">
-                      <div className="w-4 h-4 rounded-sm shadow-sm" style={{ backgroundColor: color }}></div>
-                      <span className="text-gray-600 font-medium">{g}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-1 mt-1">
-                  <div className="text-xs font-medium text-gray-600 mb-2">{gas ? `${gas} Emission Level` : 'Total Emission Level'}</div>
-                  <div className="h-3 w-full rounded bg-gradient-to-r from-[#fef08a] via-[#f97316] to-[#991b1b]"></div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isLegendOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isLegendOpen && (
+            <div>
+              <div className="px-4 py-3">
+                <div>
+                  <p className="text-[10px] text-gray-400 font-medium mb-2">
+                    {gas ? `${gas} Emission Level` : 'Total Emission Level'}
+                  </p>
+                  <div className="h-2.5 w-full rounded-full" style={{ background: 'linear-gradient(to right, #31A354, #FFEDA0, #FD8D3C, #E31A1C, #800026)' }} />
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1.5 font-medium">
                     <span>Low</span>
                     <span>High</span>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Timeline */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-auto max-w-3xl z-10 flex items-center bg-white/95 backdrop-blur-md px-3 py-2 rounded-full shadow-lg border border-white/20">
-        <button 
-          onClick={() => setIsPlaying(!isPlaying)}
-          className="mr-3 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-colors shadow-md flex-shrink-0"
-        >
-          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
-        </button>
-
-        {/* Forecast Mode Toggle */}
-        <div className="flex items-center bg-gray-100 rounded-full p-1 mr-4 flex-shrink-0">
-          <button 
-            onClick={() => setForecastMode('Future Forecasts')}
-            className={`px-3 py-1 text-[10px] font-bold tracking-wider rounded-full transition-colors ${forecastMode === 'Future Forecasts' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            FUTURE
-          </button>
-          <button 
-            onClick={() => setForecastMode('Past Forecasts')}
-            className={`px-3 py-1 text-[10px] font-bold tracking-wider rounded-full transition-colors ${forecastMode === 'Past Forecasts' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            PAST
-          </button>
+          )}
         </div>
+      </div>
 
-        <div className="flex items-center flex-1 text-xs font-medium">
-          {intervals.map((interval, idx) => (
-            <div key={interval} className="flex items-center last:flex-none">
-              <button 
-                onClick={() => {
-                  setActiveTimelineIndex(idx);
-                  setIsPlaying(false);
-                }}
-                className={`flex-shrink-0 px-3 h-7 rounded-full flex items-center justify-center transition-all duration-300 ${idx === activeTimelineIndex ? 'bg-green-500 text-white shadow-sm' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
+      {/* ── Timeline ── */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+        <div className="flex items-center gap-2 bg-white/97 backdrop-blur-xl px-3 py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100">
+          {/* Play/Pause */}
+          <button
+            onClick={() => setIsPlaying(!isPlaying)}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all shadow-sm ${
+              isPlaying
+                ? 'bg-gray-800 text-white hover:bg-gray-900'
+                : 'bg-brand-500 text-white hover:bg-brand-600'
+            }`}
+          >
+            {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+          </button>
+
+          <div className="w-px h-5 bg-gray-100" />
+
+          {/* Forecast mode */}
+          <div className="flex items-center bg-gray-50 rounded-xl p-0.5 flex-shrink-0">
+            {(['Future Forecasts', 'Past Forecasts'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setForecastMode(mode)}
+                className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                  forecastMode === mode
+                    ? 'bg-white text-brand-700 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
               >
-                {interval}
+                {mode === 'Future Forecasts' ? 'FUTURE' : 'PAST'}
               </button>
-              {idx < intervals.length - 1 && (
-                <div className="w-4 h-px bg-gray-300 mx-1"></div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
+
+          <div className="w-px h-5 bg-gray-100" />
+
+          {/* Interval pills */}
+          <div className="flex items-center gap-1">
+            {intervals.map((iv, idx) => (
+              <button
+                key={iv}
+                onClick={() => { setActiveTimelineIndex(idx); setIsPlaying(false); }}
+                className={`px-3 h-7 rounded-xl text-[11px] font-semibold transition-all duration-200 ${
+                  idx === activeTimelineIndex
+                    ? 'bg-brand-500 text-white shadow-sm shadow-brand-200'
+                    : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                {iv}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+      {/* ── Zoom Controls ── */}
+      <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2">
+        {/* unchanged zoom controls inside Map.tsx if they exist, but actually looking at the original it was just standard Mapbox zoom controls or none. Wait, let me just add the How To Modal at the very end of Map.tsx */}
+      </div>
+
+      {/* ── How To Use Modal ── */}
+      <AnimatePresence>
+        {isHowToOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4"
+            onClick={() => setIsHowToOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-3xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center">
+                    <HelpCircle className="w-5 h-5 text-brand-600" />
+                  </div>
+                  <h2 className="text-xl font-extrabold text-gray-800 tracking-tight">How to use the Map</h2>
+                </div>
+                <button
+                  onClick={() => setIsHowToOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-8 text-gray-600 space-y-8">
+                
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-wide">
+                    <span className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-black">1</span>
+                    Filtering Data
+                  </h3>
+                  <p className="text-sm leading-relaxed pl-8 text-gray-500">
+                    Use the top navigation bar to filter data by <strong>Year</strong>, <strong>Gas Type</strong> (like CO₂, CH₄), or <strong>Sector</strong> (like Energy, Agriculture). The map will dynamically update the heatmap colors to reflect your selection.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-wide">
+                    <span className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-black">2</span>
+                    Exploring Regions
+                  </h3>
+                  <p className="text-sm leading-relaxed pl-8 text-gray-500">
+                    <strong>Hover</strong> over any region to see a quick summary of its total emissions and dominant sources. <strong>Click</strong> on a region to lock the popup in place. You can also use the <strong>search bar</strong> at the top right to instantly zoom into any region by name.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-wide">
+                    <span className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-black">3</span>
+                    Timeline Controls
+                  </h3>
+                  <p className="text-sm leading-relaxed pl-8 text-gray-500">
+                    At the bottom center, you can use the <strong>Play</strong> button to animate the map through time and observe how emissions evolve over the years. You can toggle the data view between historical records and future projections using the tabs.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                  <button 
+                    onClick={() => setIsHowToOpen(false)}
+                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold rounded-xl shadow-sm transition-colors"
+                  >
+                    Got it!
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
