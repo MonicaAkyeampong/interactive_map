@@ -2,6 +2,7 @@ services:
   - type: web
     name: interactive-map-backend
     env: python
+    plan: free
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
@@ -15,6 +16,7 @@ services:
   - type: web
     name: interactive-map-frontend
     env: node
+    plan: free
     buildCommand: "cd frontend && npm install && npm run build"
     startCommand: "cd frontend && npm run start"
     envVars:
@@ -26,3 +28,4 @@ services:
 databases:
   - name: interactive-map-db
     databaseName: ghana_ghg
+    plan: free
