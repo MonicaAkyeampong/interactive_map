@@ -33,3 +33,22 @@ app.include_router(emissions.router)
 @app.get("/")
 def read_root():
     return {"message": "GHG Emissions API is running. Check /docs for the interactive documentation."}
+
+@app.get("/seed")
+def trigger_seed():
+    import os
+    from seed import seed_database
+    
+    file_path = "GHG_dataset.xlsx"
+    if not os.path.exists(file_path):
+        # Fallback to csv if it was named that way in the original script
+        file_path = "GHG_dataset_Raw_Data.csv"
+        
+    if not os.path.exists(file_path):
+        return {"error": "Dataset file not found on the server."}
+        
+    try:
+        seed_database(file_path)
+        return {"message": "Database seeded successfully! You can now use the app."}
+    except Exception as e:
+        return {"error": f"An error occurred during seeding: {str(e)}"}
