@@ -13,6 +13,8 @@ class Region(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     emissions = relationship("Emission", back_populates="region")
+    districts = relationship("District", back_populates="region")
+
 
 class Sector(Base):
     __tablename__ = "sectors"
@@ -70,3 +72,43 @@ class Emission(Base):
     __table_args__ = (
         UniqueConstraint('region_id', 'sector_id', 'gas_id', 'year', name='uq_emission_record'),
     )
+
+class District(Base):
+    __tablename__ = "districts"
+
+    district_id = Column(Integer, primary_key=True, index=True)
+    district_name = Column(String(100), nullable=False, unique=True)
+    region_id = Column(Integer, ForeignKey("regions.region_id"), nullable=False)
+    status = Column(String(50))
+    pop_2010 = Column(BigInteger)
+    pop_2021 = Column(BigInteger)
+    reg_share_pct = Column(Numeric(10, 4))
+    rank_2022 = Column(Integer)
+    per_capita_2022 = Column(Numeric(20, 6))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    region = relationship("Region", back_populates="districts")
+    emissions = relationship("DistrictEmission", back_populates="district")
+
+class DistrictEmission(Base):
+    __tablename__ = "district_emissions"
+
+    district_emission_id = Column(BigInteger, primary_key=True, index=True)
+    district_id = Column(Integer, ForeignKey("districts.district_id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
+    gas_id = Column(Integer, ForeignKey("gases.gas_id"), nullable=True)
+    emission_value = Column(Numeric(20, 6), nullable=False)
+    unit = Column(String(50), default='ktCO2e')
+    dataset_id = Column(Integer, ForeignKey("datasets.dataset_id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    district = relationship("District", back_populates="emissions")
+    sector = relationship("Sector")
+    gas = relationship("Gas")
+    dataset = relationship("Dataset")
+
+    __table_args__ = (
+        UniqueConstraint('district_id', 'sector_id', 'gas_id', 'year', name='uq_district_emission_record'),
+    )
+

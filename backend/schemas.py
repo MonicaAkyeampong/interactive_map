@@ -97,3 +97,64 @@ class EmissionWithRelations(Emission):
 
     class Config:
         orm_mode = True
+
+# District Schemas
+class DistrictBase(BaseModel):
+    district_name: str
+    region_id: int
+    status: Optional[str] = None
+    pop_2010: Optional[int] = None
+    pop_2021: Optional[int] = None
+    reg_share_pct: Optional[Decimal] = None
+    rank_2022: Optional[int] = None
+    per_capita_2022: Optional[Decimal] = None
+
+class DistrictCreate(DistrictBase):
+    pass
+
+class District(DistrictBase):
+    district_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+
+class DistrictWithRelations(District):
+    region: Region
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+
+# DistrictEmission Schemas
+class DistrictEmissionBase(BaseModel):
+    district_id: int
+    year: int
+    sector_id: Optional[int] = None
+    gas_id: Optional[int] = None
+    emission_value: Decimal
+    unit: Optional[str] = 'ktCO2e'
+    dataset_id: int
+
+class DistrictEmissionCreate(DistrictEmissionBase):
+    pass
+
+class DistrictEmission(DistrictEmissionBase):
+    district_emission_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+
+class DistrictEmissionWithRelations(DistrictEmission):
+    district: District
+    sector: Optional[Sector] = None
+    gas: Optional[Gas] = None
+    dataset: Dataset
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+

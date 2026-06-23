@@ -3,7 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from database import engine, SessionLocal
-from models import Base, Dataset, Region, Sector, Gas, Emission
+from models import Base, Dataset, Region, Sector, Gas, Emission, District, DistrictEmission
 
 def seed_database(file_path: str):
     if not os.path.exists(file_path):
@@ -145,6 +145,165 @@ def seed_database(file_path: str):
             print(f"Success! {len(records_to_insert)} emission records were successfully inserted into the database.")
         else:
             print("No valid emission records were found to insert.")
+
+        # =====================================================
+        # 4. SEED DISTRICT LEVEL EMISSIONS DATA
+        # =====================================================
+        district_file = "district_emissions_gh.xlsx"
+        base_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else "."
+        district_path = os.path.join(base_dir, district_file)
+        if not os.path.exists(district_path):
+            district_path = os.path.join(os.path.dirname(file_path), district_file)
+            
+        if os.path.exists(district_path):
+            print(f"Reading district data from {district_path}...")
+            dist_df = pd.read_excel(district_path, sheet_name="Raw Data")
+            dist_df = dist_df.iloc[:262]
+            
+            print("Seeding districts...")
+            districts_dict = {}
+            for _, row in dist_df.iterrows():
+                district_name = row["District"]
+                region_name = row["Region"]
+                status = row["Status"]
+                pop_2010 = int(row["Pop2010"]) if not pd.isna(row["Pop2010"]) else None
+                pop_2021 = int(row["Pop2021"]) if not pd.isna(row["Pop2021"]) else None
+                reg_share_pct = float(row["RegSharePct"]) if not pd.isna(row["RegSharePct"]) else None
+                rank_2022 = int(row["Rank2022"]) if not pd.isna(row["Rank2022"]) else None
+                per_capita_2022 = float(row["PerCapita2022_tCO2e"]) if not pd.isna(row["PerCapita2022_tCO2e"]) else None
+                
+                reg_id = regions_dict.get(region_name)
+                if not reg_id:
+                    print(f"Warning: Region '{region_name}' not found for district '{district_name}'")
+                    continue
+                    
+                district_obj = District(
+                    district_name=district_name,
+                    region_id=reg_id,
+                    status=status,
+                    pop_2010=pop_2010,
+                    pop_2021=pop_2021,
+                    reg_share_pct=reg_share_pct,
+                    rank_2022=rank_2022,
+                    per_capita_2022=per_capita_2022
+                )
+                session.add(district_obj)
+                session.flush()
+                districts_dict[district_name] = district_obj.district_id
+                
+            session.commit()
+            print(f"Seeded {len(districts_dict)} districts.")
+            
+            print("Processing and inserting district emissions...")
+            dist_records = []
+            
+            # 1. Historical years (1990 to 2021) -> Total emissions
+            for year in range(1990, 2022):
+                col_name = f"E_{year}"
+                for _, row in dist_df.iterrows():
+                    district_name = row["District"]
+                    dist_id = districts_dict.get(district_name)
+                    if not dist_id:
+                        continue
+                        
+                    val = row[col_name]
+                    if not pd.isna(val):
+                        dist_records.append({
+                            "district_id": dist_id,
+                            "year": year,
+                            "sector_id": None,
+                            "gas_id": None,
+                            "emission_value": float(val),
+                            "unit": "ktCO2e",
+                            "dataset_id": dataset_id
+                        })
+                        
+            # 2. Year 2022 Total
+            for _, row in dist_df.iterrows():
+                district_name = row["District"]
+                dist_id = districts_dict.get(district_name)
+                if not dist_id:
+                    continue
+                val = row["E2022_Total"]
+                if not pd.isna(val):
+                    dist_records.append({
+                        "district_id": dist_id,
+                        "year": 2022,
+                        "sector_id": None,
+                        "gas_id": None,
+                        "emission_value": float(val),
+                        "unit": "ktCO2e",
+                        "dataset_id": dataset_id
+                    })
+                    
+            # 3. Year 2022 Sectors
+            sector_cols = {
+                "E2022_Energy": "Energy",
+                "E2022_AgriLU": "Agriculture",
+                "E2022_LULUCF": "LULUCF",
+                "E2022_IPPU": "IPPU",
+                "E2022_Waste": "Waste"
+            }
+            for col_name, db_sec_name in sector_cols.items():
+                sec_id = sectors_dict.get(db_sec_name)
+                if not sec_id:
+                    print(f"Warning: Sector '{db_sec_name}' not found in database.")
+                    continue
+                for _, row in dist_df.iterrows():
+                    district_name = row["District"]
+                    dist_id = districts_dict.get(district_name)
+                    if not dist_id:
+                        continue
+                    val = row[col_name]
+                    if not pd.isna(val):
+                        dist_records.append({
+                            "district_id": dist_id,
+                            "year": 2022,
+                            "sector_id": sec_id,
+                            "gas_id": None,
+                            "emission_value": float(val),
+                            "unit": "ktCO2e",
+                            "dataset_id": dataset_id
+                        })
+                        
+            # 4. Year 2022 Gases
+            gas_cols = {
+                "E2022_CO2": "CO2",
+                "E2022_CH4": "CH4",
+                "E2022_N2O": "N2O",
+                "E2022_HFC": "HFC"
+            }
+            for col_name, db_gas_formula in gas_cols.items():
+                gas_id = gases_dict.get(db_gas_formula)
+                if not gas_id:
+                    print(f"Warning: Gas '{db_gas_formula}' not found in database.")
+                    continue
+                for _, row in dist_df.iterrows():
+                    district_name = row["District"]
+                    dist_id = districts_dict.get(district_name)
+                    if not dist_id:
+                        continue
+                    val = row[col_name]
+                    if not pd.isna(val):
+                        dist_records.append({
+                            "district_id": dist_id,
+                            "year": 2022,
+                            "sector_id": None,
+                            "gas_id": gas_id,
+                            "emission_value": float(val),
+                            "unit": "ktCO2e",
+                            "dataset_id": dataset_id
+                        })
+                        
+            if dist_records:
+                session.bulk_insert_mappings(DistrictEmission, dist_records)
+                session.commit()
+                print(f"Success! {len(dist_records)} district emission records were successfully inserted into the database.")
+            else:
+                print("No district emission records found to insert.")
+        else:
+            print(f"District emissions file not found at {district_path}. Skipping district seeding.")
+
 
     except Exception as e:
         session.rollback()

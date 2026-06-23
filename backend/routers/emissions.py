@@ -242,3 +242,41 @@ def get_available_filters(
         "gases": sorted(gases),
         "sectors": sorted(sectors)
     }
+
+@router.get("/districts", response_model=List[schemas.District])
+def read_districts(
+    region_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 300,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.District)
+    if region_id is not None:
+        query = query.filter(models.District.region_id == region_id)
+    districts = query.offset(skip).limit(limit).all()
+    return districts
+
+@router.get("/district-emissions", response_model=List[schemas.DistrictEmissionWithRelations])
+def read_district_emissions(
+    district_id: Optional[int] = None,
+    gas_id: Optional[int] = None,
+    sector_id: Optional[int] = None,
+    year: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 2000,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.DistrictEmission)
+    
+    if district_id is not None:
+        query = query.filter(models.DistrictEmission.district_id == district_id)
+    if gas_id is not None:
+        query = query.filter(models.DistrictEmission.gas_id == gas_id)
+    if sector_id is not None:
+        query = query.filter(models.DistrictEmission.sector_id == sector_id)
+    if year is not None:
+        query = query.filter(models.DistrictEmission.year == year)
+        
+    emissions = query.offset(skip).limit(limit).all()
+    return emissions
+
