@@ -87,7 +87,7 @@ export default function Sidebar() {
       variants={containerVariants}
       initial={reducedMotion ? false : 'hidden'}
       animate="visible"
-      className="absolute left-16 top-1/2 -translate-y-1/2 z-10 w-64 flex flex-col gap-2.5"
+      className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-64 flex flex-col gap-2.5"
     >
       {/* Main stats card */}
       <motion.div

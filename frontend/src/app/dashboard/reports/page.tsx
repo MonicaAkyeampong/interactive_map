@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function ReportsPage() {
   return (
-    <div className="absolute inset-0 pl-[76px] flex items-center justify-center bg-[#F8FAFC]">
+    <div className="absolute inset-0 px-[76px] flex items-center justify-center bg-[#F8FAFC]">
       <div className="text-center max-w-sm">
         <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center mx-auto mb-5">
           <FileText className="w-6 h-6 text-gray-400" />

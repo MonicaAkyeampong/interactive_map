@@ -17,7 +17,7 @@ export default function DashboardNav() {
   const reducedMotion = useReducedMotion() ?? false;
 
   return (
-    <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-1.5 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-2">
+    <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-1.5 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-2">
       {/* Home — returns to landing page */}
       <motion.div
         whileHover={reducedMotion ? {} : { scale: 1.1 }}
@@ -54,11 +54,11 @@ export default function DashboardNav() {
                   : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
               }`}
             >
-              {/* Sliding left-border indicator via layoutId */}
+              {/* Sliding right-border indicator via layoutId */}
               {active && (
                 <motion.span
                   layoutId="activeNavIndicator"
-                  className="absolute left-0.5 top-2 bottom-2 w-[3px] bg-[#00C853] rounded-full"
+                  className="absolute right-0.5 top-2 bottom-2 w-[3px] bg-[#00C853] rounded-full"
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
               )}
