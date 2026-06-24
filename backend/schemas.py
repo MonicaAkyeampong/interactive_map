@@ -6,6 +6,7 @@ from decimal import Decimal
 # Region Schemas
 class RegionBase(BaseModel):
     region_name: str
+    abbreviation: Optional[str] = None
     area_km2: Optional[Decimal] = None
     population: Optional[int] = None
 

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import models
 import os
 from database import engine
-from routers import emissions
+from routers import emissions, analysis
 
 # Create tables if they don't exist
 models.Base.metadata.create_all(bind=engine)
@@ -29,6 +29,7 @@ app.add_middleware(
 )
 
 app.include_router(emissions.router)
+app.include_router(analysis.router)
 
 @app.get("/")
 def read_root():

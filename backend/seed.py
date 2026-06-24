@@ -73,9 +73,29 @@ def seed_database(file_path: str):
         df_sorted_pop = df.dropna(subset=['Region', 'Population']).sort_values('Year')
         latest_pop = df_sorted_pop.groupby('Region')['Population'].last().to_dict()
 
+        abbrev_map = {
+            "Greater Accra": "GAR",
+            "Ashanti": "AR",
+            "Western": "WR",
+            "Eastern": "ER",
+            "Central": "CR",
+            "Volta": "VR",
+            "Northern": "NR",
+            "Upper East": "UER",
+            "Upper West": "UWR",
+            "Bono": "BR",
+            "Bono East": "BER",
+            "Ahafo": "AF",
+            "Savannah": "SR",
+            "North East": "NER",
+            "Oti": "OR",
+            "Western North": "WNR"
+        }
+
         for region_name, pop in latest_pop.items():
             if pd.isna(region_name): continue
-            reg = Region(region_name=region_name, population=int(pop))
+            abbrev = abbrev_map.get(region_name)
+            reg = Region(region_name=region_name, population=int(pop), abbreviation=abbrev)
             session.add(reg)
             session.flush()
             regions_dict[region_name] = reg.region_id

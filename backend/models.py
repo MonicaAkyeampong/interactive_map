@@ -8,6 +8,7 @@ class Region(Base):
 
     region_id = Column(Integer, primary_key=True, index=True)
     region_name = Column(String(100), nullable=False, unique=True)
+    abbreviation = Column(String(5), unique=True, nullable=True)
     area_km2 = Column(Numeric(12, 2))
     population = Column(BigInteger)
     created_at = Column(DateTime, default=datetime.utcnow)
