@@ -81,3 +81,20 @@ html, body {
   border-radius: 3px;
 }
 
+
+.back-btn {
+  margin-top: 20px;
+  padding: 10px 15px;
+  background-color: #31A354;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  width: 100%;
+}
+
+.back-btn:hover {
+  background-color: #238b45;
+}

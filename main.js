@@ -57,10 +57,53 @@
         info.update();
       }
 
+      let districtGeojson;
+
+      function clickFeature(e) {
+        const layer = e.target;
+        map.fitBounds(layer.getBounds());
+
+        const regionName = layer.feature.properties.REGION;
+        if (!regionName) return;
+        loadDistricts(regionName);
+      }
+
+      function loadDistricts(regionName) {
+        const safeRegionName = regionName.toLowerCase().replace(/ /g, "_").replace(/\//g, "_");
+        const districtUrl = `districts_${safeRegionName}.geojson`;
+
+        fetch(districtUrl)
+          .then((res) => {
+            if (!res.ok) throw new Error("District data not found");
+            return res.json();
+          })
+          .then((data) => {
+            if (geojson) map.removeLayer(geojson);
+            if (districtGeojson) map.removeLayer(districtGeojson);
+
+            districtGeojson = L.geoJSON(data, {
+              style: {
+                fillColor: "#31A354",
+                weight: 1,
+                opacity: 1,
+                color: "white",
+                fillOpacity: 0.5,
+              },
+              onEachFeature: function (feature, layer) {
+                layer.bindTooltip(feature.properties.DISTRICT || "Unknown District");
+              },
+            }).addTo(map);
+
+            document.getElementById("back-to-regions").style.display = "block";
+          })
+          .catch((err) => console.error("Error loading districts:", err));
+      }
+
       function onEachFeature(feature, layer) {
         layer.on({
           mouseover: highlightFeature,
           mouseout: resetHighlight,
+          click: clickFeature,
         });
       }
 
@@ -147,6 +190,23 @@ header.addEventListener("click", () => {
 const toggleBtn = document.querySelector(".panel-toggle");
 const panel = document.getElementById("sidePanel");
 
-toggleBtn.addEventListener("click", () => {
-  panel.classList.toggle("open");
-});
+if (toggleBtn && panel) {
+  toggleBtn.addEventListener("click", () => {
+    panel.classList.toggle("open");
+  });
+}
+
+const backBtn = document.getElementById("back-to-regions");
+if (backBtn) {
+  backBtn.addEventListener("click", () => {
+    if (districtGeojson) {
+      map.removeLayer(districtGeojson);
+      districtGeojson = null;
+    }
+    if (geojson) {
+      geojson.addTo(map);
+    }
+    map.setView([7.9465, -1.0232], 6);
+    backBtn.style.display = "none";
+  });
+}

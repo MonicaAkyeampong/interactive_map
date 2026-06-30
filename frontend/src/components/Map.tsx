@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import MapboxMap, { Source, Layer, Popup } from 'react-map-gl/mapbox';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import MapboxMap, { Source, Layer, Popup, MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useStore } from '@/store/useStore';
 import { fetchMapData } from '@/lib/api';
@@ -31,7 +31,11 @@ const GAS_LABELS: Record<string, string> = {
   HFC: 'Hydrofluorocarbon',
 };
 
+const EMPTY_GEOJSON: any = { type: 'FeatureCollection', features: [] };
+
 export default function Map() {
+  const mapRef = useRef<MapRef>(null);
+
   const {
     year, gas, sector, activeTimelineIndex, isPlaying,
     setActiveTimelineIndex, setIsPlaying, mapMode, setMapMode,
@@ -42,6 +46,9 @@ export default function Map() {
   const [isLegendOpen, setIsLegendOpen] = useState(true);
   const [isHowToOpen, setIsHowToOpen] = useState(false);
   const [clickedRegionInfo, setClickedRegionInfo] = useState<{ feature: any; longitude: number; latitude: number } | null>(null);
+
+  const [districtData, setDistrictData] = useState<any>(null);
+  const [activeDistrictLayer, setActiveDistrictLayer] = useState<string | null>(null);
 
   const intervals = ['24hrs', '48hrs', '72hrs', '1 week', '1 month'];
 
@@ -61,6 +68,65 @@ export default function Map() {
     return () => clearInterval(id);
   }, [isPlaying, setActiveTimelineIndex, intervals.length, activeTimelineIndex]);
 
+  const zoomToRegion = useCallback((feature: any) => {
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+    const coords = feature.geometry.type === 'MultiPolygon' 
+      ? feature.geometry.coordinates.flat(2) 
+      : feature.geometry.coordinates.flat(1);
+      
+    coords.forEach(([lng, lat]: number[]) => {
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    });
+    
+    const centerLng = (minLng + maxLng) / 2;
+    const centerLat = (minLat + maxLat) / 2;
+    
+    if (mapRef.current) {
+      mapRef.current.fitBounds(
+        [
+          [minLng, minLat],
+          [maxLng, maxLat]
+        ],
+        { padding: 40, duration: 1500 }
+      );
+    } else {
+      setViewState(prev => ({
+        ...prev,
+        longitude: centerLng,
+        latitude: centerLat,
+        zoom: 7.5,
+        transitionDuration: 1500
+      }));
+    }
+    
+    setClickedRegionInfo({ feature, longitude: centerLng, latitude: centerLat });
+
+    const regionName = feature.properties.REGION || feature.properties.name || '';
+    if (regionName) {
+      const safeRegionName = regionName.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
+      fetch(`/districts_${safeRegionName}.geojson`)
+        .then(res => {
+          if (!res.ok) throw new Error('Not found');
+          return res.json();
+        })
+        .then(data => {
+          setDistrictData(data);
+          setActiveDistrictLayer(regionName);
+        })
+        .catch(e => console.error(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeDistrictLayer && viewState.zoom < 5.8) {
+      setActiveDistrictLayer(null);
+      setClickedRegionInfo(null);
+    }
+  }, [viewState.zoom, activeDistrictLayer]);
+
   useEffect(() => {
     if (!searchedRegion || !geoData) return;
     
@@ -69,33 +135,10 @@ export default function Map() {
     );
     
     if (feature) {
-      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-      const coords = feature.geometry.type === 'MultiPolygon' 
-        ? feature.geometry.coordinates.flat(2) 
-        : feature.geometry.coordinates.flat(1);
-        
-      coords.forEach(([lng, lat]: number[]) => {
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-      });
-      
-      const centerLng = (minLng + maxLng) / 2;
-      const centerLat = (minLat + maxLat) / 2;
-      
-      setViewState(prev => ({
-        ...prev,
-        longitude: centerLng,
-        latitude: centerLat,
-        zoom: 7.5,
-        transitionDuration: 1500
-      }));
-      
-      setClickedRegionInfo({ feature, longitude: centerLng, latitude: centerLat });
+      zoomToRegion(feature);
       setSearchedRegion(null);
     }
-  }, [searchedRegion, geoData, setSearchedRegion]);
+  }, [searchedRegion, geoData, setSearchedRegion, zoomToRegion]);
 
   useEffect(() => {
     async function loadData() {
@@ -152,14 +195,20 @@ export default function Map() {
   };
 
   const onClick = useCallback((event: any) => {
-    const { features, lngLat } = event;
+    const { features } = event;
     const f = features?.[0];
-    if (f) {
-      setClickedRegionInfo({ feature: f, longitude: lngLat.lng, latitude: lngLat.lat });
-    } else {
+    
+    if (event.features && event.features.length > 0 && event.features[0].source === 'ghana-districts') {
+        // District clicked, could handle this later
+        return;
+    }
+
+    if (f && f.source === 'ghana-regions') {
+      zoomToRegion(f);
+    } else if (!activeDistrictLayer) {
       setClickedRegionInfo(null);
     }
-  }, []);
+  }, [zoomToRegion, activeDistrictLayer]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -181,10 +230,11 @@ export default function Map() {
   return (
     <div className="absolute inset-0">
       <MapboxMap
+        ref={mapRef}
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
         onClick={onClick}
-        interactiveLayerIds={['regions-fill']}
+        interactiveLayerIds={['regions-fill', 'districts-fill']}
         cursor="pointer"
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
@@ -195,7 +245,7 @@ export default function Map() {
           <Source id="ghana-regions" type="geojson" data={geoData}>
             <Layer {...fillStyle} />
             <Layer {...lineStyle} />
-            {clickedRegionInfo?.feature && (
+            {clickedRegionInfo?.feature && !activeDistrictLayer && (
               <Layer
                 id="region-highlight"
                 type="line"
@@ -208,6 +258,50 @@ export default function Map() {
             )}
           </Source>
         )}
+
+        <Source 
+          id="ghana-districts" 
+          type="geojson" 
+          data={activeDistrictLayer ? (districtData || EMPTY_GEOJSON) : EMPTY_GEOJSON}
+        >
+          <Layer 
+            id="districts-fill"
+            type="fill"
+            paint={{
+              'fill-color': '#31A354',
+              'fill-opacity': 0.3
+            }}
+            layout={{
+              visibility: activeDistrictLayer ? 'visible' : 'none'
+            }}
+          />
+          <Layer 
+            id="districts-line"
+            type="line"
+            paint={{
+              'line-color': '#ffffff',
+              'line-width': 1.5
+            }}
+            layout={{
+              visibility: activeDistrictLayer ? 'visible' : 'none'
+            }}
+          />
+          <Layer 
+            id="districts-label"
+            type="symbol"
+            layout={{
+              'text-field': ['get', 'DISTRICT'],
+              'text-size': 12,
+              'text-anchor': 'center',
+              visibility: activeDistrictLayer ? 'visible' : 'none'
+            }}
+            paint={{
+              'text-color': '#1f2937',
+              'text-halo-color': '#ffffff',
+              'text-halo-width': 2
+            }}
+          />
+        </Source>
 
         <AnimatePresence>
           {clickedRegionInfo?.feature && (
@@ -233,6 +327,27 @@ export default function Map() {
           )}
         </AnimatePresence>
       </MapboxMap>
+
+      {activeDistrictLayer && (
+        <div className="absolute top-6 left-6 z-10">
+          <button
+            onClick={() => {
+              setActiveDistrictLayer(null);
+              setClickedRegionInfo(null);
+              setViewState((prev: any) => ({
+                ...prev,
+                longitude: -1.0232,
+                latitude: 7.9465,
+                zoom: 5.5,
+                transitionDuration: 1500
+              }));
+            }}
+            className="px-4 py-2 bg-white text-gray-800 font-bold rounded-lg shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            ← Back to Regions
+          </button>
+        </div>
+      )}
 
       {/* ── Zoom Controls ── */}
       <div className="absolute right-6 bottom-6 flex flex-col gap-1.5 z-10">
