@@ -115,13 +115,15 @@ export default function HomeMap() {
           initialViewState={{
             longitude: -1.0232,
             latitude: 7.9465,
-            zoom: 5.6
+            zoom: 6.5
           }}
           mapStyle="mapbox://styles/mapbox/light-v11"
           mapboxAccessToken={MAPBOX_TOKEN}
           style={{ width: '100%', height: '100%' }}
           interactive={false}
           attributionControl={false}
+          maxBounds={[[-9.0, 1.0], [7.0, 15.0]]}
+          minZoom={6.2}
           onLoad={onMapLoad}
         />
       )}

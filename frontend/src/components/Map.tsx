@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MapboxMap, { Source, Layer, Popup, MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useStore } from '@/store/useStore';
@@ -49,13 +49,60 @@ export default function Map() {
 
   const [districtData, setDistrictData] = useState<any>(null);
   const [activeDistrictLayer, setActiveDistrictLayer] = useState<string | null>(null);
+  const [isZoomingToRegion, setIsZoomingToRegion] = useState(false);
 
   const intervals = ['24hrs', '48hrs', '72hrs', '1 week', '1 month'];
+
+  const getCenter = (feature: any) => {
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+    const coords = feature.geometry.type === 'MultiPolygon' 
+      ? feature.geometry.coordinates.flat(2) 
+      : feature.geometry.coordinates.flat(1);
+      
+    coords.forEach(([lng, lat]: number[]) => {
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    });
+    return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+  };
+
+  // Deduplicate district names to avoid repeated labels
+  const uniqueDistrictData = useMemo(() => {
+    if (!districtData) return null;
+    const seen = new Set();
+    const newFeatures = districtData.features.map((f: any) => {
+      const name = f.properties.DISTRICT;
+      if (!name || seen.has(name)) {
+        return { ...f, properties: { ...f.properties, DISTRICT: '' } };
+      }
+      seen.add(name);
+      return f;
+    });
+    return { ...districtData, features: newFeatures };
+  }, [districtData]);
+
+  // Create point features for labels so Mapbox only draws one label per MultiPolygon
+  const labelData = useMemo(() => {
+    if (!uniqueDistrictData) return null;
+    const features = uniqueDistrictData.features
+      .filter((f: any) => f.properties.DISTRICT)
+      .map((f: any) => {
+        const center = getCenter(f);
+        return {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: center },
+          properties: { DISTRICT: f.properties.DISTRICT }
+        };
+      });
+    return { type: 'FeatureCollection', features };
+  }, [uniqueDistrictData]);
 
   const [viewState, setViewState] = useState({
     longitude: -1.0232,
     latitude: 7.9465,
-    zoom: 5.5,
+    zoom: 6.5,
   });
 
   useEffect(() => {
@@ -69,6 +116,9 @@ export default function Map() {
   }, [isPlaying, setActiveTimelineIndex, intervals.length, activeTimelineIndex]);
 
   const zoomToRegion = useCallback((feature: any) => {
+    const [centerLng, centerLat] = getCenter(feature);
+    
+    // Calculate bounds for fitBounds
     let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
     const coords = feature.geometry.type === 'MultiPolygon' 
       ? feature.geometry.coordinates.flat(2) 
@@ -81,8 +131,8 @@ export default function Map() {
       if (lat > maxLat) maxLat = lat;
     });
     
-    const centerLng = (minLng + maxLng) / 2;
-    const centerLat = (minLat + maxLat) / 2;
+    setIsZoomingToRegion(true);
+    setTimeout(() => setIsZoomingToRegion(false), 1600);
     
     if (mapRef.current) {
       mapRef.current.fitBounds(
@@ -121,11 +171,11 @@ export default function Map() {
   }, []);
 
   useEffect(() => {
-    if (activeDistrictLayer && viewState.zoom < 5.8) {
+    if (activeDistrictLayer && viewState.zoom < 6.8 && !isZoomingToRegion) {
       setActiveDistrictLayer(null);
       setClickedRegionInfo(null);
     }
-  }, [viewState.zoom, activeDistrictLayer]);
+  }, [viewState.zoom, activeDistrictLayer, isZoomingToRegion]);
 
   useEffect(() => {
     if (!searchedRegion || !geoData) return;
@@ -156,9 +206,13 @@ export default function Map() {
         geoRes.features.forEach((f: any) => {
           const name = (f.properties.REGION || f.properties.name || '').toLowerCase();
           const bd = mapDataLower[name] || {};
+          let total = 0;
           Object.keys(GAS_COLORS).forEach(g => {
-            f.properties[g] = bd[g] ? bd[g] : 0;
+            const val = bd[g] ? bd[g] : 0;
+            f.properties[g] = val;
+            total += val;
           });
+          f.properties.TOTAL_EMISSIONS = total;
           f.properties.dominant_gas = bd.dominant_gas !== 'None' ? bd.dominant_gas : 'CO2';
         });
 
@@ -174,12 +228,13 @@ export default function Map() {
     id: 'regions-fill',
     type: 'fill',
     paint: {
-      'fill-color': ['interpolate', ['linear'], ['get', gas || 'CO2'],
-        0, '#31A354',      // Very low: green
-        2000, '#FFEDA0',   // Low: pale yellow
-        4000, '#FD8D3C',   // Moderate: orange
-        8000, '#E31A1C',   // High: red
-        20000, '#800026'], // Very high: deep red
+      'fill-color': ['step', ['get', gas || 'TOTAL_EMISSIONS'],
+        '#31A354', // Dark green: < 1482
+        1482, '#A1D99B', // Light green: 1482 - 2985
+        2985, '#FEE08B', // Yellow: 2985 - 4478
+        4478, '#FDAE61', // Orange: 4478 - 7463
+        7463, '#D73027' // Red: > 7463
+      ],
       'fill-opacity': 0.72,
     },
   };
@@ -240,18 +295,20 @@ export default function Map() {
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
+        maxBounds={[[-9.0, 1.0], [7.0, 15.0]]}
+        minZoom={6.2}
       >
         {geoData && (
           <Source id="ghana-regions" type="geojson" data={geoData}>
             <Layer {...fillStyle} />
             <Layer {...lineStyle} />
-            {clickedRegionInfo?.feature && !activeDistrictLayer && (
+            {clickedRegionInfo?.feature && (
               <Layer
                 id="region-highlight"
                 type="line"
                 paint={{
-                  'line-color': '#1DB978',
-                  'line-width': 3,
+                  'line-color': '#ffffff',
+                  'line-width': 4,
                 }}
                 filter={['==', ['get', 'REGION'], clickedRegionInfo.feature.properties.REGION]}
               />
@@ -262,7 +319,7 @@ export default function Map() {
         <Source 
           id="ghana-districts" 
           type="geojson" 
-          data={activeDistrictLayer ? (districtData || EMPTY_GEOJSON) : EMPTY_GEOJSON}
+          data={activeDistrictLayer ? (uniqueDistrictData || EMPTY_GEOJSON) : EMPTY_GEOJSON}
         >
           <Layer 
             id="districts-fill"
@@ -280,24 +337,33 @@ export default function Map() {
             type="line"
             paint={{
               'line-color': '#ffffff',
-              'line-width': 1.5
+              'line-width': 2,
+              'line-opacity': 0.8
             }}
             layout={{
               visibility: activeDistrictLayer ? 'visible' : 'none'
             }}
           />
+        </Source>
+
+        <Source 
+          id="ghana-districts-labels-source" 
+          type="geojson" 
+          data={activeDistrictLayer ? (labelData || EMPTY_GEOJSON) : EMPTY_GEOJSON}
+        >
           <Layer 
             id="districts-label"
             type="symbol"
             layout={{
               'text-field': ['get', 'DISTRICT'],
-              'text-size': 12,
+              'text-size': 13,
               'text-anchor': 'center',
+              'text-allow-overlap': true,
               visibility: activeDistrictLayer ? 'visible' : 'none'
             }}
             paint={{
-              'text-color': '#1f2937',
-              'text-halo-color': '#ffffff',
+              'text-color': 'rgba(255, 255, 255, 0.95)',
+              'text-halo-color': 'rgba(0,0,0,0.8)',
               'text-halo-width': 2
             }}
           />
@@ -393,15 +459,38 @@ export default function Map() {
           {isLegendOpen && (
             <div>
               <div className="px-4 py-3">
-                <div>
-                  <p className="text-[10px] text-gray-400 font-medium mb-2">
-                    {gas ? `${gas} Emission Level` : 'Total Emission Level'}
-                  </p>
-                  <div className="h-2.5 w-full rounded-full" style={{ background: 'linear-gradient(to right, #31A354, #FFEDA0, #FD8D3C, #E31A1C, #800026)' }} />
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-1.5 font-medium">
-                    <span>Low</span>
-                    <span>High</span>
-                  </div>
+                <p className="text-[10px] text-gray-400 font-medium mb-3 uppercase tracking-wider">
+                  {gas ? `${gas} Emission Level` : 'Total Emission Level'}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {(() => {
+                    const isPerCapita = false; // Toggle left out for now
+                    const unitLabel = isPerCapita ? 't CO₂e/capita/yr' : 'kt CO₂e/yr';
+                    const tiers = isPerCapita 
+                      ? [
+                          { range: '< 0.72', color: '#1a9850' },
+                          { range: '0.72 – 1.43', color: '#91cf60' },
+                          { range: '1.43 – 2.15', color: '#fee08b' },
+                          { range: '2.15 – 3.58', color: '#fc8d59' },
+                          { range: '> 3.58', color: '#d73027' },
+                        ]
+                      : [
+                          { range: '< 1,493', color: '#1a9850' },
+                          { range: '1,493 – 2,985', color: '#91cf60' },
+                          { range: '2,985 – 4,478', color: '#fee08b' },
+                          { range: '4,478 – 7,463', color: '#fc8d59' },
+                          { range: '> 7,463', color: '#d73027' },
+                        ];
+
+                    return tiers.map((tier, i) => (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <span className="w-3.5 h-3.5 rounded-sm flex-shrink-0 shadow-sm border border-black/5" style={{ backgroundColor: tier.color }} />
+                        <span className="text-[11px] text-gray-700 font-medium">
+                          {tier.range} <span className="text-gray-400 text-[10px] ml-0.5">{unitLabel}</span>
+                        </span>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             </div>

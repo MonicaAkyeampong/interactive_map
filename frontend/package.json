@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@turf/difference": "^7.3.5",
+    "@turf/helpers": "^7.3.5",
+    "@turf/union": "^7.3.5",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.14.0",
     "mapbox-gl": "^3.23.0",

@@ -72,7 +72,7 @@ def compare_entities(
         gases_2022 = {row.formula: float(row.total) for row in gases_2022_query}
 
         total_emissions_2022 = sum(sectors_2022.values())
-        per_capita_2022 = float(total_emissions_2022) / float(total_pop2021) if total_pop2021 else 0
+        per_capita_2022 = (float(total_emissions_2022) * 1000.0) / float(total_pop2021) if total_pop2021 else 0
 
         results.append({
             "id": 0,
@@ -139,7 +139,7 @@ def compare_entities(
             gases_2022 = {row.formula: float(row.total) for row in gases_2022_query}
 
             total_emissions_2022 = sum(sectors_2022.values())
-            per_capita_2022 = float(total_emissions_2022) / float(pop2021) if pop2021 else 0
+            per_capita_2022 = (float(total_emissions_2022) * 1000.0) / float(pop2021) if pop2021 else 0
 
             results.append({
                 "id": region.region_id,

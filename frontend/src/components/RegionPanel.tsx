@@ -56,7 +56,7 @@ export default function HoverRegionDetails({ regionName }: { regionName: string 
   }
 
   const perCapita = data.population && data.total_emissions 
-    ? (data.total_emissions / data.population).toFixed(2) 
+    ? ((data.total_emissions * 1000) / data.population).toFixed(2) 
     : 'N/A';
 
   return (
