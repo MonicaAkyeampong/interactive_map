@@ -141,3 +141,52 @@ export async function fetchAvailableFilters(
   }
   return res.json();
 }
+
+export async function fetchDistrictSummaryData(
+  year?: number,
+  gas?: string,
+  sector?: string,
+  district?: string
+): Promise<{
+  total_emissions: number,
+  total_sources: number,
+  unit: string,
+  sector_breakdown: {sector: string, total: number}[],
+  gas_breakdown: {gas: string, total: number}[],
+  population: number | null
+}> {
+  const params = new URLSearchParams();
+  if (year !== undefined) params.append('year', year.toString());
+  if (gas) params.append('gas_name', gas);
+  if (sector) params.append('sector_name', sector);
+  if (district) params.append('district_name', district);
+
+  const queryString = params.toString();
+  const url = `${API_BASE_URL}/district-summary${queryString ? `?${queryString}` : ''}`;
+
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error('Failed to fetch district summary data');
+  }
+  return res.json();
+}
+
+export async function fetchDistrictMapData(
+  year?: number,
+  sector?: string,
+  region?: string
+): Promise<Record<string, any>> {
+  const params = new URLSearchParams();
+  if (year !== undefined) params.append('year', year.toString());
+  if (sector) params.append('sector_name', sector);
+  if (region) params.append('region_name', region);
+
+  const queryString = params.toString();
+  const url = `${API_BASE_URL}/district-map-data${queryString ? `?${queryString}` : ''}`;
+
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error('Failed to fetch district map data');
+  }
+  return res.json();
+}

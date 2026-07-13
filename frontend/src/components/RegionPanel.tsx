@@ -7,7 +7,15 @@ import { Building2 } from 'lucide-react';
 
 const cache: Record<string, any> = {};
 
-export default function HoverRegionDetails({ regionName }: { regionName: string }) {
+export default function HoverRegionDetails({ 
+  regionName,
+  isDistrictViewActive,
+  onToggleDistrictView 
+}: { 
+  regionName: string;
+  isDistrictViewActive?: boolean;
+  onToggleDistrictView?: (val: boolean) => void;
+}) {
   const { year, gas, sector } = useStore();
   
   const cacheKey = `${regionName}-${year}-${gas}-${sector}`;
@@ -45,14 +53,14 @@ export default function HoverRegionDetails({ regionName }: { regionName: string 
 
   if (isLoading) {
     return (
-      <div className="p-3 w-56 flex justify-center items-center h-24">
+      <div className="p-3 w-full flex justify-center items-center h-24">
         <div className="w-5 h-5 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!data) {
-    return <div className="p-3 w-56 text-center text-xs text-gray-500">No data</div>;
+    return <div className="p-3 w-full text-center text-xs text-gray-500">No data</div>;
   }
 
   const perCapita = data.population && data.total_emissions 
@@ -60,7 +68,7 @@ export default function HoverRegionDetails({ regionName }: { regionName: string 
     : 'N/A';
 
   return (
-    <div className="w-56 bg-white/97 rounded-xl flex flex-col shadow-sm">
+    <div className="w-full bg-white/97 rounded-xl flex flex-col shadow-sm">
       {/* Header */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
         <Building2 className="w-3.5 h-3.5 text-brand-600" />
@@ -129,6 +137,22 @@ export default function HoverRegionDetails({ regionName }: { regionName: string 
           })()}
         </div>
 
+        {onToggleDistrictView && (
+          <>
+            <div className="w-full h-px bg-gray-100 my-1" />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-medium text-gray-700">View District Demarcations</span>
+              <button 
+                onClick={() => onToggleDistrictView(!isDistrictViewActive)}
+                className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${isDistrictViewActive ? 'bg-brand-500' : 'bg-gray-200'}`}
+              >
+                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isDistrictViewActive ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            
+
+          </>
+        )}
       </div>
     </div>
   );

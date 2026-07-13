@@ -4,10 +4,11 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MapboxMap, { Source, Layer, Popup, MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useStore } from '@/store/useStore';
-import { fetchMapData } from '@/lib/api';
+import { fetchMapData, fetchDistrictMapData } from '@/lib/api';
 import { Play, Pause, Plus, Minus, Layers, ChevronDown, HelpCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import HoverRegionDetails from './RegionPanel';
+import DistrictPanel from './DistrictPanel';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
@@ -50,6 +51,8 @@ export default function Map() {
   const [districtData, setDistrictData] = useState<any>(null);
   const [activeDistrictLayer, setActiveDistrictLayer] = useState<string | null>(null);
   const [isZoomingToRegion, setIsZoomingToRegion] = useState(false);
+  const [isDistrictViewActive, setIsDistrictViewActive] = useState(false);
+  const [activeDistrict, setActiveDistrict] = useState<{ feature: any; longitude: number; latitude: number } | null>(null);
 
   const intervals = ['24hrs', '48hrs', '72hrs', '1 week', '1 month'];
 
@@ -157,23 +160,47 @@ export default function Map() {
     const regionName = feature.properties.REGION || feature.properties.name || '';
     if (regionName) {
       const safeRegionName = regionName.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
-      fetch(`/districts_${safeRegionName}.geojson`)
-        .then(res => {
+      
+      Promise.all([
+        fetch(`/districts_${safeRegionName}.geojson`).then(res => {
           if (!res.ok) throw new Error('Not found');
           return res.json();
-        })
-        .then(data => {
-          setDistrictData(data);
-          setActiveDistrictLayer(regionName);
-        })
-        .catch(e => console.error(e));
+        }),
+        fetchDistrictMapData(year && !isNaN(Number(year)) ? Number(year) : undefined, sector || undefined, regionName)
+      ])
+      .then(([geoData, distMapData]) => {
+        const normalizeName = (name: string) => name.toLowerCase().replace(/\s*(district|municipal|metropolitan|assembly)\s*/gi, '').trim();
+        const mapDataNormalized = Object.fromEntries(
+          Object.entries(distMapData).map(([k, v]) => [normalizeName(k), { originalName: k, ...v }])
+        );
+        geoData.features.forEach((f: any) => {
+          const name = normalizeName(f.properties.DISTRICT || f.properties.name || '');
+          const bd = mapDataNormalized[name] || {};
+          if (bd.originalName) {
+            f.properties.DISTRICT = bd.originalName;
+          }
+          let total = 0;
+          Object.keys(GAS_COLORS).forEach(g => {
+            const val = bd[g] ? bd[g] : 0;
+            f.properties[g] = val;
+            total += val;
+          });
+          f.properties.TOTAL_EMISSIONS = total;
+          f.properties.dominant_gas = bd.dominant_gas !== 'None' ? bd.dominant_gas : 'CO2';
+        });
+        setDistrictData(geoData);
+        setActiveDistrictLayer(regionName);
+      })
+      .catch(e => console.error(e));
     }
-  }, []);
+  }, [year, sector]);
 
   useEffect(() => {
     if (activeDistrictLayer && viewState.zoom < 6.8 && !isZoomingToRegion) {
       setActiveDistrictLayer(null);
       setClickedRegionInfo(null);
+      setIsDistrictViewActive(false);
+      setActiveDistrict(null);
     }
   }, [viewState.zoom, activeDistrictLayer, isZoomingToRegion]);
 
@@ -235,7 +262,7 @@ export default function Map() {
         4478, '#FDAE61', // Orange: 4478 - 7463
         7463, '#D73027' // Red: > 7463
       ],
-      'fill-opacity': 0.72,
+      'fill-opacity': isDistrictViewActive ? 0.05 : 0.72,
     },
   };
 
@@ -254,7 +281,6 @@ export default function Map() {
     const f = features?.[0];
     
     if (event.features && event.features.length > 0 && event.features[0].source === 'ghana-districts') {
-        // District clicked, could handle this later
         return;
     }
 
@@ -264,6 +290,26 @@ export default function Map() {
       setClickedRegionInfo(null);
     }
   }, [zoomToRegion, activeDistrictLayer]);
+
+  const onMouseMove = useCallback((event: any) => {
+    const { features } = event;
+    const f = features?.[0];
+    
+    if (f && f.source === 'ghana-districts' && isDistrictViewActive) {
+      setActiveDistrict(prev => {
+        if (prev?.feature?.properties?.DISTRICT === f.properties.DISTRICT) {
+          return prev;
+        }
+        return {
+          feature: f,
+          longitude: event.lngLat.lng,
+          latitude: event.lngLat.lat
+        };
+      });
+    } else {
+      setActiveDistrict(prev => prev ? null : prev);
+    }
+  }, [isDistrictViewActive]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -289,6 +335,8 @@ export default function Map() {
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
         onClick={onClick}
+        onMouseMove={onMouseMove}
+        onMouseLeave={() => setActiveDistrict(null)}
         interactiveLayerIds={['regions-fill', 'districts-fill']}
         cursor="pointer"
         mapStyle="mapbox://styles/mapbox/light-v11"
@@ -325,11 +373,17 @@ export default function Map() {
             id="districts-fill"
             type="fill"
             paint={{
-              'fill-color': '#31A354',
-              'fill-opacity': 0.3
+              'fill-color': ['step', ['get', gas || 'TOTAL_EMISSIONS'],
+                '#1a9850',
+                50, '#91cf60',
+                150, '#fee08b',
+                300, '#fc8d59',
+                600, '#d73027'
+              ],
+              'fill-opacity': 0.7
             }}
             layout={{
-              visibility: activeDistrictLayer ? 'visible' : 'none'
+              visibility: isDistrictViewActive ? 'visible' : 'none'
             }}
           />
           <Layer 
@@ -341,7 +395,7 @@ export default function Map() {
               'line-opacity': 0.8
             }}
             layout={{
-              visibility: activeDistrictLayer ? 'visible' : 'none'
+              visibility: isDistrictViewActive ? 'visible' : 'none'
             }}
           />
         </Source>
@@ -359,7 +413,7 @@ export default function Map() {
               'text-size': 13,
               'text-anchor': 'center',
               'text-allow-overlap': true,
-              visibility: activeDistrictLayer ? 'visible' : 'none'
+              visibility: isDistrictViewActive ? 'visible' : 'none'
             }}
             paint={{
               'text-color': 'rgba(255, 255, 255, 0.95)',
@@ -370,13 +424,16 @@ export default function Map() {
         </Source>
 
         <AnimatePresence>
-          {clickedRegionInfo?.feature && (
+          {/* Region side panel moved outside MapboxMap */}
+
+          {activeDistrict?.feature && (
             <Popup
-              longitude={clickedRegionInfo.longitude}
-              latitude={clickedRegionInfo.latitude}
+              key="district-popup"
+              longitude={activeDistrict.longitude}
+              latitude={activeDistrict.latitude}
               closeButton={true}
               closeOnClick={false}
-              onClose={() => setClickedRegionInfo(null)}
+              onClose={() => setActiveDistrict(null)}
               offset={12}
               className="z-50 !p-0 shadow-xl rounded-xl custom-popup"
               maxWidth="300px"
@@ -387,33 +444,52 @@ export default function Map() {
                 exit={{ opacity: 0, scale: 0.95, y: 4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
               >
-                <HoverRegionDetails regionName={clickedRegionInfo.feature.properties.REGION || clickedRegionInfo.feature.properties.name || 'Region'} />
+                <DistrictPanel districtName={activeDistrict.feature.properties.DISTRICT || activeDistrict.feature.properties.name || 'District'} />
               </motion.div>
             </Popup>
           )}
         </AnimatePresence>
       </MapboxMap>
 
-      {activeDistrictLayer && (
-        <div className="absolute top-6 left-6 z-10">
-          <button
-            onClick={() => {
-              setActiveDistrictLayer(null);
-              setClickedRegionInfo(null);
-              setViewState((prev: any) => ({
-                ...prev,
-                longitude: -1.0232,
-                latitude: 7.9465,
-                zoom: 5.5,
-                transitionDuration: 1500
-              }));
-            }}
-            className="px-4 py-2 bg-white text-gray-800 font-bold rounded-lg shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 hover:bg-gray-50 transition-colors flex items-center gap-2"
+      <AnimatePresence>
+        {clickedRegionInfo?.feature && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="absolute top-6 right-6 z-20 w-[300px] shadow-2xl rounded-2xl overflow-hidden bg-white/97 backdrop-blur-md border border-gray-100"
           >
-            ← Back to Regions
-          </button>
-        </div>
-      )}
+            {/* Header with Back button */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-100 bg-gray-50/80">
+              <button 
+                onClick={() => {
+                  setActiveDistrictLayer(null);
+                  setClickedRegionInfo(null);
+                  setIsDistrictViewActive(false);
+                  setActiveDistrict(null);
+                  setViewState((prev: any) => ({
+                    ...prev,
+                    longitude: -1.0232,
+                    latitude: 7.9465,
+                    zoom: 5.5,
+                    transitionDuration: 1500
+                  }));
+                }}
+                className="text-xs font-bold text-gray-500 hover:text-brand-600 flex items-center gap-1.5 transition-colors bg-white px-2.5 py-1.5 rounded-lg shadow-sm border border-gray-100"
+              >
+                <span>←</span> Back to National
+              </button>
+            </div>
+            <div className="p-1">
+              <HoverRegionDetails 
+                regionName={clickedRegionInfo.feature.properties.REGION || clickedRegionInfo.feature.properties.name || 'Region'} 
+                isDistrictViewActive={isDistrictViewActive}
+                onToggleDistrictView={setIsDistrictViewActive}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Zoom Controls ── */}
       <div className="absolute right-6 bottom-6 flex flex-col gap-1.5 z-10">
@@ -473,6 +549,14 @@ export default function Map() {
                           { range: '1.43 – 2.15', color: '#fee08b' },
                           { range: '2.15 – 3.58', color: '#fc8d59' },
                           { range: '> 3.58', color: '#d73027' },
+                        ]
+                      : isDistrictViewActive
+                      ? [
+                          { range: '< 50', color: '#1a9850' },
+                          { range: '50 – 150', color: '#91cf60' },
+                          { range: '150 – 300', color: '#fee08b' },
+                          { range: '300 – 600', color: '#fc8d59' },
+                          { range: '> 600', color: '#d73027' },
                         ]
                       : [
                           { range: '< 1,493', color: '#1a9850' },
