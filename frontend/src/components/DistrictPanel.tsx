@@ -7,11 +7,7 @@ import { Building2 } from 'lucide-react';
 
 const cache: Record<string, any> = {};
 
-function getFillColor(value: number) {
-  return value < 50 ? '#1a9850' : value < 150 ? '#91cf60' : value < 300 ? '#fee08b' : value < 600 ? '#fc8d59' : '#d73027';
-}
-
-export default function DistrictPanel({ districtName }: { districtName: string }) {
+export default function DistrictPanel({ districtName, mapColor }: { districtName: string; mapColor: string }) {
   const { year, gas, sector } = useStore();
   
   const cacheKey = `district-${districtName}-${year}-${gas}-${sector}`;
@@ -63,7 +59,7 @@ export default function DistrictPanel({ districtName }: { districtName: string }
     ? ((data.total_emissions * 1000) / data.population).toFixed(2) 
     : 'N/A';
 
-  const districtColor = getFillColor(data.total_emissions);
+  // Removed getFillColor since we use the mapColor prop
 
   return (
     <div className="w-56 bg-white/97 rounded-xl flex flex-col shadow-sm">
@@ -81,9 +77,9 @@ export default function DistrictPanel({ districtName }: { districtName: string }
           <div className="flex justify-between items-center text-[10px]">
             <span className="text-gray-500 font-medium">Total Em. ({year || 'All Yrs'})</span>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: districtColor }} />
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: mapColor }} />
               <span className="font-bold text-gray-800">
-                {data.total_emissions.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-[9px] text-gray-400 font-normal">kt</span>
+                {data.total_emissions.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-[9px] text-gray-400 font-normal">{data.unit || 'kt'}</span>
               </span>
             </div>
           </div>

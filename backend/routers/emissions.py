@@ -329,10 +329,19 @@ def get_district_summary(
     district_id = None
     population = None
     if district_name:
+        clean_name = district_name.lower().replace(" district", "").replace(" municipal", "").replace(" metropolitan", "").replace(" assembly", "").strip()
+        # Try exact match first
         district_obj = db.query(models.District).filter(func.lower(models.District.district_name) == district_name.lower()).first()
+        if not district_obj:
+            # Try fuzzy match
+            district_obj = db.query(models.District).filter(func.lower(models.District.district_name).like(f"%{clean_name}%")).first()
+            
         if district_obj:
             district_id = district_obj.district_id
             population = district_obj.pop_2021 or district_obj.pop_2010
+        else:
+            # Prevent summing national total by forcing a query that returns 0
+            district_id = -1
 
     query = db.query(
         func.sum(models.DistrictEmission.emission_value).label('total_emissions'),

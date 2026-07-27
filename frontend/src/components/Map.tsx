@@ -34,6 +34,15 @@ const GAS_LABELS: Record<string, string> = {
 
 const EMPTY_GEOJSON: any = { type: 'FeatureCollection', features: [] };
 
+function getComputedColor(val: number, bps: number[]) {
+  if (!bps || bps.length < 4) return '#1a9850';
+  if (val < bps[0]) return '#1a9850';
+  if (val < bps[1]) return '#91cf60';
+  if (val < bps[2]) return '#fee08b';
+  if (val < bps[3]) return '#fc8d59';
+  return '#d73027';
+}
+
 export default function Map() {
   const mapRef = useRef<MapRef>(null);
 
@@ -49,6 +58,7 @@ export default function Map() {
   const [clickedRegionInfo, setClickedRegionInfo] = useState<{ feature: any; longitude: number; latitude: number } | null>(null);
 
   const [districtData, setDistrictData] = useState<any>(null);
+  const [nationalDistrictMapData, setNationalDistrictMapData] = useState<Record<string, any> | null>(null);
   const [activeDistrictLayer, setActiveDistrictLayer] = useState<string | null>(null);
   const [isZoomingToRegion, setIsZoomingToRegion] = useState(false);
   const [isDistrictViewActive, setIsDistrictViewActive] = useState(false);
@@ -101,6 +111,75 @@ export default function Map() {
       });
     return { type: 'FeatureCollection', features };
   }, [uniqueDistrictData]);
+
+  // Calculate percentile breakpoints for national districts
+  const districtBreakpoints = useMemo(() => {
+    if (!nationalDistrictMapData) return null;
+    const propertyToRead = gas || 'TOTAL_EMISSIONS';
+    
+    // Extract values from the national dataset
+    let values: number[] = [];
+    Object.values(nationalDistrictMapData).forEach((districtObj: any) => {
+      let val = 0;
+      if (propertyToRead === 'TOTAL_EMISSIONS') {
+        Object.keys(GAS_COLORS).forEach(g => {
+          if (districtObj[g]) val += districtObj[g];
+        });
+      } else {
+        val = districtObj[propertyToRead] || 0;
+      }
+      if (val != null && !isNaN(val)) {
+        values.push(val);
+      }
+    });
+      
+    if (values.length === 0) return null;
+    
+    values.sort((a: number, b: number) => a - b);
+    
+    const getQuantile = (q: number) => {
+      const pos = (values.length - 1) * q;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      if (values[base + 1] !== undefined) {
+        return values[base] + rest * (values[base + 1] - values[base]);
+      } else {
+        return values[base];
+      }
+    };
+    
+    let bp1 = getQuantile(0.2);
+    let bp2 = getQuantile(0.4);
+    let bp3 = getQuantile(0.6);
+    let bp4 = getQuantile(0.8);
+    
+    // Mapbox GL JS 'step' expression requires stops to be strictly in ascending order.
+    // In case of many identical values, we add a tiny epsilon to ensure strict monotonicity.
+    if (bp2 <= bp1) bp2 = bp1 + 0.0001;
+    if (bp3 <= bp2) bp3 = bp2 + 0.0001;
+    if (bp4 <= bp3) bp4 = bp3 + 0.0001;
+    
+    return [bp1, bp2, bp3, bp4];
+  }, [nationalDistrictMapData, gas]);
+
+  const districtFillColor = useMemo(() => {
+    if (!districtBreakpoints) {
+      return ['step', ['get', gas || 'TOTAL_EMISSIONS'],
+        '#1a9850',
+        50, '#91cf60',
+        150, '#fee08b',
+        300, '#fc8d59',
+        600, '#d73027'
+      ];
+    }
+    return ['step', ['get', gas || 'TOTAL_EMISSIONS'],
+      '#1a9850',
+      districtBreakpoints[0], '#91cf60',
+      districtBreakpoints[1], '#fee08b',
+      districtBreakpoints[2], '#fc8d59',
+      districtBreakpoints[3], '#d73027'
+    ];
+  }, [districtBreakpoints, gas]);
 
   const [viewState, setViewState] = useState({
     longitude: -1.0232,
@@ -175,7 +254,12 @@ export default function Map() {
         );
         geoData.features.forEach((f: any) => {
           const name = normalizeName(f.properties.DISTRICT || f.properties.name || '');
-          const bd = mapDataNormalized[name] || {};
+          let bd = mapDataNormalized[name];
+          if (!bd) {
+            // Fuzzy match fallback
+            const foundKey = Object.keys(mapDataNormalized).find(k => k.includes(name) || name.includes(k));
+            bd = foundKey ? mapDataNormalized[foundKey] : {};
+          }
           if (bd.originalName) {
             f.properties.DISTRICT = bd.originalName;
           }
@@ -249,6 +333,19 @@ export default function Map() {
       }
     }
     loadData();
+  }, [year, sector]);
+
+  useEffect(() => {
+    async function loadNationalDistrictData() {
+      try {
+        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const data = await fetchDistrictMapData(y, sector || undefined);
+        setNationalDistrictMapData(data);
+      } catch (err) {
+        console.error('Failed to load national district data', err);
+      }
+    }
+    loadNationalDistrictData();
   }, [year, sector]);
 
   const fillStyle: any = {
@@ -373,13 +470,7 @@ export default function Map() {
             id="districts-fill"
             type="fill"
             paint={{
-              'fill-color': ['step', ['get', gas || 'TOTAL_EMISSIONS'],
-                '#1a9850',
-                50, '#91cf60',
-                150, '#fee08b',
-                300, '#fc8d59',
-                600, '#d73027'
-              ],
+              'fill-color': districtFillColor as any,
               'fill-opacity': 0.7
             }}
             layout={{
@@ -444,7 +535,10 @@ export default function Map() {
                 exit={{ opacity: 0, scale: 0.95, y: 4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
               >
-                <DistrictPanel districtName={activeDistrict.feature.properties.DISTRICT || activeDistrict.feature.properties.name || 'District'} />
+                <DistrictPanel 
+                  districtName={activeDistrict.feature.properties.DISTRICT || activeDistrict.feature.properties.name || 'District'} 
+                  mapColor={getComputedColor(activeDistrict.feature.properties[gas || 'TOTAL_EMISSIONS'] || 0, districtBreakpoints || [])}
+                />
               </motion.div>
             </Popup>
           )}
@@ -542,6 +636,12 @@ export default function Map() {
                   {(() => {
                     const isPerCapita = false; // Toggle left out for now
                     const unitLabel = isPerCapita ? 't CO₂e/capita/yr' : 'kt CO₂e/yr';
+                    const formatNum = (n: number) => {
+                      if (n < 1) return n.toFixed(2);
+                      if (n < 10) return n.toFixed(1);
+                      return Math.round(n).toLocaleString();
+                    };
+                    
                     const tiers = isPerCapita 
                       ? [
                           { range: '< 0.72', color: '#1a9850' },
@@ -551,13 +651,19 @@ export default function Map() {
                           { range: '> 3.58', color: '#d73027' },
                         ]
                       : isDistrictViewActive
-                      ? [
+                      ? (districtBreakpoints ? [
+                          { range: `< ${formatNum(districtBreakpoints[0])}`, color: '#1a9850' },
+                          { range: `${formatNum(districtBreakpoints[0])} – ${formatNum(districtBreakpoints[1])}`, color: '#91cf60' },
+                          { range: `${formatNum(districtBreakpoints[1])} – ${formatNum(districtBreakpoints[2])}`, color: '#fee08b' },
+                          { range: `${formatNum(districtBreakpoints[2])} – ${formatNum(districtBreakpoints[3])}`, color: '#fc8d59' },
+                          { range: `> ${formatNum(districtBreakpoints[3])}`, color: '#d73027' },
+                        ] : [
                           { range: '< 50', color: '#1a9850' },
                           { range: '50 – 150', color: '#91cf60' },
                           { range: '150 – 300', color: '#fee08b' },
                           { range: '300 – 600', color: '#fc8d59' },
                           { range: '> 600', color: '#d73027' },
-                        ]
+                        ])
                       : [
                           { range: '< 1,493', color: '#1a9850' },
                           { range: '1,493 – 2,985', color: '#91cf60' },
