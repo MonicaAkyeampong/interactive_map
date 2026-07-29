@@ -256,7 +256,55 @@ def read_districts(
     districts = query.offset(skip).limit(limit).all()
     return districts
 
-@router.get("/district-emissions", response_model=List[schemas.DistrictEmissionWithRelations])
+import re
+
+DISTRICT_ALIASES = {
+    'atwima-mponua': 'Atwima Mponua District',
+    'mfantseman': 'Mfantseman Municipal',
+    'akyemansa': 'Akyemansa District',
+    'okere': 'Okere District',
+    'adenta': 'Adentan Municipal',
+    'ashaiman': 'Ashaiman Municipal',
+    'korle-klottey': 'Korle Klottey Municipal',
+    'krowor': 'Krowor Municipal',
+    'la-dade-kotopon': 'La Dade-Kotopon Municipal',
+    'ningo-prampram': 'Ningo Prampram District',
+    'okaikwei north': 'Okaikwei North Municipal',
+    'shai osudoku': 'Shai-Osudoku District',
+    'weija gbawe': 'Ga South Municipal',
+    'bunkpurugu nakpanduri': 'Bunkpurugu-Nyankpala District',
+    'sagnerigu': 'Sagnarigu Municipal',
+    'kasena nankana east': 'Kassena-Nankana Municipal',
+    'kasena nankana west': 'Kassena-Nankana West District',
+    'afadzato south': 'Afadjato South District',
+    'keta municipal': 'Keta Municipal',
+    'kpando': 'Kpando Municipal',
+    'juaboso': 'Juabeso District',
+    'ada east': 'Ada East District',
+    'ada west': 'Ada West District',
+    'ga north': 'Ga North Municipal',
+    'east mamprusi': 'Nalerigu-Gambaga (East Mamprusi) Municipal',
+    'west mamprusi': 'Walewale (West Mamprusi) Municipal',
+    'west gonja': 'Damongo (West Gonja) Municipal',
+    'new juaben south': 'Koforidua (New Juaben South) Municipal',
+    'new juaben north': 'New Juaben North Municipal',
+    'krachi east': 'Dambai (Krachi East) Municipal',
+    'tano south': 'Tano South Municipal',
+    'adansi akrofuom': 'Akrofuom District',
+    'sekyere afram plains north': 'Sekyere Afram Plains District',
+    'akwapem south': 'Akuapem South District',
+    'akwapem north': 'Akuapem North Municipal',
+    'lambussie-karni': 'Lambussie District',
+    'dormaa': 'Dormaa Central Municipal',
+    'kwaebibirem': 'Kwaebibirem Municipal',
+    'juaben': 'Juaben Municipal',
+    'tema west': 'Tema West Municipal',
+    'atwima-nwabiagya south': 'Atwima Nwabiagya Municipal',
+    'bolga east': 'Bolgatanga East District',
+    'asikuma-odoben-brakwa': 'Asikuma Odoben Brakwa District',
+    'obuasi east': 'Obuasi East District',
+    'upper manya': 'Upper Manya Krobo District'
+}
 
 @router.get("/district-map-data")
 def get_district_map_data(
@@ -273,34 +321,61 @@ def get_district_map_data(
         if sector_obj:
             sector_id = sector_obj.sector_id
 
-    query = db.query(
+    region_id = None
+    if region_name:
+        region_obj = db.query(models.Region).filter(func.lower(models.Region.region_name) == region_name.lower()).first()
+        if region_obj:
+            region_id = region_obj.region_id
+
+    # 1. Total emissions per district (filter sector_id IS NULL and gas_id IS NULL to prevent triple counting)
+    totals_query = db.query(
+        models.District.district_name,
+        func.sum(models.DistrictEmission.emission_value).label('total')
+    ).join(models.DistrictEmission, models.DistrictEmission.district_id == models.District.district_id)
+    
+    if region_id:
+        totals_query = totals_query.filter(models.District.region_id == region_id)
+    if year:
+        totals_query = totals_query.filter(models.DistrictEmission.year == year)
+    if sector_id:
+        totals_query = totals_query.filter(models.DistrictEmission.sector_id == sector_id)
+    else:
+        totals_query = totals_query.filter(models.DistrictEmission.sector_id.is_(None), models.DistrictEmission.gas_id.is_(None))
+        
+    totals_results = totals_query.group_by(models.District.district_name).all()
+    
+    map_data = {}
+    for dist_name, total_val in totals_results:
+        map_data[dist_name] = {
+            "TOTAL_EMISSIONS": float(total_val) if total_val else 0
+        }
+        
+    # 2. Gas breakdown per district (e.g. for 2022 when gas_id is present)
+    gas_query = db.query(
         models.District.district_name,
         models.Gas.formula,
         func.sum(models.DistrictEmission.emission_value).label('value')
     ).join(models.DistrictEmission, models.DistrictEmission.district_id == models.District.district_id)\
      .join(models.Gas, models.DistrictEmission.gas_id == models.Gas.gas_id)
      
-    if region_name:
-        region_obj = db.query(models.Region).filter(func.lower(models.Region.region_name) == region_name.lower()).first()
-        if region_obj:
-            query = query.filter(models.District.region_id == region_obj.region_id)
-            
+    if region_id:
+        gas_query = gas_query.filter(models.District.region_id == region_id)
     if year:
-        query = query.filter(models.DistrictEmission.year == year)
+        gas_query = gas_query.filter(models.DistrictEmission.year == year)
     if sector_id:
-        query = query.filter(models.DistrictEmission.sector_id == sector_id)
+        gas_query = gas_query.filter(models.DistrictEmission.sector_id == sector_id)
         
-    results = query.group_by(models.District.district_name, models.Gas.formula).all()
+    gas_results = gas_query.group_by(models.District.district_name, models.Gas.formula).all()
     
-    map_data = {}
-    for district_name, gas_formula, value in results:
-        if district_name not in map_data:
-            map_data[district_name] = {}
-        map_data[district_name][gas_formula] = float(value) if value else 0
+    for dist_name, gas_formula, val in gas_results:
+        if dist_name not in map_data:
+            map_data[dist_name] = {}
+        map_data[dist_name][gas_formula] = float(val) if val else 0
         
-    for district_name, gases in map_data.items():
+    for dist_name, data_obj in map_data.items():
+        gases = {k: v for k, v in data_obj.items() if k != "TOTAL_EMISSIONS" and k != "dominant_gas"}
         dominant_gas = max(gases, key=gases.get) if gases else "None"
-        map_data[district_name]["dominant_gas"] = dominant_gas
+        map_data[dist_name]["dominant_gas"] = dominant_gas
         
     return map_data
 
@@ -329,18 +404,26 @@ def get_district_summary(
     district_id = None
     population = None
     if district_name:
-        clean_name = district_name.lower().replace(" district", "").replace(" municipal", "").replace(" metropolitan", "").replace(" assembly", "").strip()
-        # Try exact match first
-        district_obj = db.query(models.District).filter(func.lower(models.District.district_name) == district_name.lower()).first()
+        target_name = district_name.strip()
+        alias_target = DISTRICT_ALIASES.get(target_name.lower(), target_name)
+        
+        district_obj = db.query(models.District).filter(func.lower(models.District.district_name) == alias_target.lower()).first()
         if not district_obj:
-            # Try fuzzy match
-            district_obj = db.query(models.District).filter(func.lower(models.District.district_name).like(f"%{clean_name}%")).first()
+            district_obj = db.query(models.District).filter(func.lower(models.District.district_name) == target_name.lower()).first()
             
+        if not district_obj:
+            clean_str = re.sub(r'[^a-z0-9]', '', target_name.lower().replace(" district", "").replace(" municipal", "").replace(" metropolitan", "").replace(" assembly", ""))
+            all_dists = db.query(models.District).all()
+            for d in all_dists:
+                d_clean = re.sub(r'[^a-z0-9]', '', d.district_name.lower().replace(" district", "").replace(" municipal", "").replace(" metropolitan", "").replace(" assembly", ""))
+                if clean_str and d_clean and (clean_str == d_clean or clean_str in d_clean or d_clean in clean_str):
+                    district_obj = d
+                    break
+
         if district_obj:
             district_id = district_obj.district_id
             population = district_obj.pop_2021 or district_obj.pop_2010
         else:
-            # Prevent summing national total by forcing a query that returns 0
             district_id = -1
 
     query = db.query(
@@ -354,6 +437,8 @@ def get_district_summary(
         query = query.filter(models.DistrictEmission.gas_id == gas_id)
     if sector_id:
         query = query.filter(models.DistrictEmission.sector_id == sector_id)
+    if not gas_id and not sector_id:
+        query = query.filter(models.DistrictEmission.sector_id.is_(None), models.DistrictEmission.gas_id.is_(None))
     if district_id:
         query = query.filter(models.DistrictEmission.district_id == district_id)
         

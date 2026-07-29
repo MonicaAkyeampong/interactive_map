@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
 import { fetchEmissions, fetchRegions, fetchGases, fetchSummaryData, Emission, Region, Gas } from '@/lib/api';
+import { VALID_REGIONAL_YEARS } from '@/lib/constants';
 import { Database, MapPin, Layers, TrendingUp } from 'lucide-react';
 
 interface SummaryData {
@@ -116,7 +117,7 @@ export default function EmissionsDashboard() {
     loadData();
   }, [selectedRegion, selectedGas, selectedYear]);
 
-  const years = Array.from({ length: 2022 - 1990 + 1 }, (_, i) => 1990 + i);
+  const years = [...VALID_REGIONAL_YEARS];
   const topSectors = summary?.sector_breakdown?.slice(0, 5) ?? [];
   const maxSector = topSectors[0]?.total ?? 1;
   const topSectorName = topSectors[0]?.sector ?? null;

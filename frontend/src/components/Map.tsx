@@ -32,15 +32,67 @@ const GAS_LABELS: Record<string, string> = {
   HFC: 'Hydrofluorocarbon',
 };
 
+const DISTRICT_ALIAS_MAP: Record<string, string> = {
+  'mfantseman': 'Mfantsiman Municipal',
+  'adansi akrofuom': 'Adansi South District',
+  'atwima-mponua': 'Atwima Nwabiagya Municipal',
+  'sekyere afram plains north': 'Sekyere Central District',
+  'tano south': 'Tano North Municipal',
+  'akyemansa': 'Asene Manso Akroso District',
+  'okere': 'Akuapem North Municipal',
+  'keta municipal': 'Anloga District',
+  'kpando': 'South Dayi District',
+  'north dayi': 'South Dayi District',
+  'adenta': 'Ga East Municipal',
+  'ashaiman': 'Tema Metropolitan',
+  'korle-klottey': 'Accra Metropolitan',
+  'krowor': 'Ledzokuku Municipal',
+  'la-dade-kotopon': 'Accra Metropolitan',
+  'ningo-prampram': 'Kpone Katamanso Municipal',
+  'okaikwei north': 'Accra Metropolitan',
+  'shai osudoku': 'Kpone Katamanso Municipal',
+  'weija gbawe': 'Ga South Municipal',
+  'ada east': 'Ga East Municipal',
+  'ada west': 'Ga West Municipal',
+  'ga north': 'Ga West Municipal',
+  'tema west': 'Tema Metropolitan',
+  'sagnerigu': 'Sagnarigu Municipal',
+  'east mamprusi': 'Nalerigu-Gambaga (East Mamprusi) Municipal',
+  'west mamprusi': 'Walewale (West Mamprusi) Municipal',
+  'west gonja': 'Damongo (West Gonja) Municipal',
+  'new juaben south': 'Koforidua (New Juaben South) Municipal',
+  'new juaben north': 'New Juaben North Municipal',
+  'krachi east': 'Dambai (Krachi East) Municipal',
+  'bunkpurugu nakpanduri': 'Bunkpurugu-Nyankpala District',
+  'kasena nankana east': 'Kassena-Nankana Municipal',
+  'kasena nankana west': 'Kassena-Nankana West District',
+  'afadzato south': 'Afadjato South District',
+  'juaboso': 'Juabeso District',
+  'akwapem south': 'Akuapem South District',
+  'akwapem north': 'Akuapem North Municipal',
+  'lambussie-karni': 'Lambussie District',
+  'dormaa': 'Dormaa Central Municipal',
+  'kwaebibirem': 'Kwaebibirem Municipal',
+  'juaben': 'Juaben Municipal',
+  'atwima-nwabiagya south': 'Atwima Nwabiagya Municipal',
+  'bolga east': 'Bolgatanga East District',
+  'asikuma-odoben-brakwa': 'Asikuma Odoben Brakwa District',
+  'obuasi east': 'Obuasi East District',
+  'upper manya': 'Upper Manya Krobo District'
+};
+
 const EMPTY_GEOJSON: any = { type: 'FeatureCollection', features: [] };
+const geoJsonCache: Record<string, any> = {};
 
 function getComputedColor(val: number, bps: number[]) {
-  if (!bps || bps.length < 4) return '#1a9850';
-  if (val < bps[0]) return '#1a9850';
-  if (val < bps[1]) return '#91cf60';
-  if (val < bps[2]) return '#fee08b';
-  if (val < bps[3]) return '#fc8d59';
-  return '#d73027';
+  if (!bps || bps.length < 6) bps = [108, 133, 167, 229, 395, 1009];
+  if (val <= bps[0]) return '#1a9850'; // Very Low
+  if (val <= bps[1]) return '#66bd63'; // Low
+  if (val <= bps[2]) return '#d9ef8b'; // Moderate
+  if (val <= bps[3]) return '#fee08b'; // High
+  if (val <= bps[4]) return '#fdae61'; // Very High
+  if (val <= bps[5]) return '#f46d43'; // Severe
+  return '#d73027';                    // Extreme Hotspot
 }
 
 export default function Map() {
@@ -49,7 +101,8 @@ export default function Map() {
   const {
     year, gas, sector, activeTimelineIndex, isPlaying,
     setActiveTimelineIndex, setIsPlaying, mapMode, setMapMode,
-    forecastMode, setForecastMode, searchedRegion, setSearchedRegion
+    forecastMode, setForecastMode, searchedRegion, setSearchedRegion,
+    isDistrictViewActive, setIsDistrictViewActive
   } = useStore();
 
   const [geoData, setGeoData] = useState<any>(null);
@@ -61,7 +114,6 @@ export default function Map() {
   const [nationalDistrictMapData, setNationalDistrictMapData] = useState<Record<string, any> | null>(null);
   const [activeDistrictLayer, setActiveDistrictLayer] = useState<string | null>(null);
   const [isZoomingToRegion, setIsZoomingToRegion] = useState(false);
-  const [isDistrictViewActive, setIsDistrictViewActive] = useState(false);
   const [activeDistrict, setActiveDistrict] = useState<{ feature: any; longitude: number; latitude: number } | null>(null);
 
   const intervals = ['24hrs', '48hrs', '72hrs', '1 week', '1 month'];
@@ -81,103 +133,51 @@ export default function Map() {
     return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
   };
 
-  // Deduplicate district names to avoid repeated labels
-  const uniqueDistrictData = useMemo(() => {
-    if (!districtData) return null;
-    const seen = new Set();
-    const newFeatures = districtData.features.map((f: any) => {
-      const name = f.properties.DISTRICT;
-      if (!name || seen.has(name)) {
-        return { ...f, properties: { ...f.properties, DISTRICT: '' } };
-      }
-      seen.add(name);
-      return f;
-    });
-    return { ...districtData, features: newFeatures };
-  }, [districtData]);
-
   // Create point features for labels so Mapbox only draws one label per MultiPolygon
   const labelData = useMemo(() => {
-    if (!uniqueDistrictData) return null;
-    const features = uniqueDistrictData.features
-      .filter((f: any) => f.properties.DISTRICT)
-      .map((f: any) => {
+    if (!districtData) return null;
+    const seen = new Set();
+    const features: any[] = [];
+    
+    districtData.features.forEach((f: any) => {
+      const name = f.properties.DISTRICT;
+      if (name && !seen.has(name)) {
+        seen.add(name);
         const center = getCenter(f);
-        return {
+        features.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: center },
-          properties: { DISTRICT: f.properties.DISTRICT }
-        };
-      });
-    return { type: 'FeatureCollection', features };
-  }, [uniqueDistrictData]);
-
-  // Calculate percentile breakpoints for national districts
-  const districtBreakpoints = useMemo(() => {
-    if (!nationalDistrictMapData) return null;
-    const propertyToRead = gas || 'TOTAL_EMISSIONS';
-    
-    // Extract values from the national dataset
-    let values: number[] = [];
-    Object.values(nationalDistrictMapData).forEach((districtObj: any) => {
-      let val = 0;
-      if (propertyToRead === 'TOTAL_EMISSIONS') {
-        Object.keys(GAS_COLORS).forEach(g => {
-          if (districtObj[g]) val += districtObj[g];
+          properties: { DISTRICT: name }
         });
-      } else {
-        val = districtObj[propertyToRead] || 0;
-      }
-      if (val != null && !isNaN(val)) {
-        values.push(val);
       }
     });
-      
-    if (values.length === 0) return null;
-    
-    values.sort((a: number, b: number) => a - b);
-    
-    const getQuantile = (q: number) => {
-      const pos = (values.length - 1) * q;
-      const base = Math.floor(pos);
-      const rest = pos - base;
-      if (values[base + 1] !== undefined) {
-        return values[base] + rest * (values[base + 1] - values[base]);
-      } else {
-        return values[base];
-      }
-    };
-    
-    let bp1 = getQuantile(0.2);
-    let bp2 = getQuantile(0.4);
-    let bp3 = getQuantile(0.6);
-    let bp4 = getQuantile(0.8);
-    
-    // Mapbox GL JS 'step' expression requires stops to be strictly in ascending order.
-    // In case of many identical values, we add a tiny epsilon to ensure strict monotonicity.
-    if (bp2 <= bp1) bp2 = bp1 + 0.0001;
-    if (bp3 <= bp2) bp3 = bp2 + 0.0001;
-    if (bp4 <= bp3) bp4 = bp3 + 0.0001;
-    
-    return [bp1, bp2, bp3, bp4];
-  }, [nationalDistrictMapData, gas]);
+    return { type: 'FeatureCollection', features };
+  }, [districtData]);
+
+  // Derive latest feature properties for active district from updated districtData state
+  const currentDistrictFeature = useMemo(() => {
+    if (!activeDistrict || !districtData) return null;
+    const name = activeDistrict.feature.properties.DISTRICT || activeDistrict.feature.properties.name;
+    return districtData.features.find((f: any) => 
+      (f.properties.DISTRICT || f.properties.name) === name
+    ) || activeDistrict.feature;
+  }, [activeDistrict, districtData]);
+
+  // Fixed 7-class adaptive percentile breakpoints derived from benchmark dataset (P20, P40, P60, P80, P95, P99)
+  const districtBreakpoints = useMemo(() => {
+    return [108, 133, 167, 229, 395, 1009];
+  }, []);
 
   const districtFillColor = useMemo(() => {
-    if (!districtBreakpoints) {
-      return ['step', ['get', gas || 'TOTAL_EMISSIONS'],
-        '#1a9850',
-        50, '#91cf60',
-        150, '#fee08b',
-        300, '#fc8d59',
-        600, '#d73027'
-      ];
-    }
+    const bps = districtBreakpoints;
     return ['step', ['get', gas || 'TOTAL_EMISSIONS'],
-      '#1a9850',
-      districtBreakpoints[0], '#91cf60',
-      districtBreakpoints[1], '#fee08b',
-      districtBreakpoints[2], '#fc8d59',
-      districtBreakpoints[3], '#d73027'
+      '#1a9850',         // Very Low (<= P20: <= 108 kt)
+      bps[0], '#66bd63', // Low (P20 - P40: 108 - 133 kt)
+      bps[1], '#d9ef8b', // Moderate (P40 - P60: 133 - 167 kt)
+      bps[2], '#fee08b', // High (P60 - P80: 167 - 229 kt)
+      bps[3], '#fdae61', // Very High (P80 - P95: 229 - 395 kt)
+      bps[4], '#f46d43', // Severe (P95 - P99: 395 - 1,009 kt)
+      bps[5], '#d73027'  // Extreme Hotspot (> P99: > 1,009 kt)
     ];
   }, [districtBreakpoints, gas]);
 
@@ -238,46 +238,73 @@ export default function Map() {
 
     const regionName = feature.properties.REGION || feature.properties.name || '';
     if (regionName) {
-      const safeRegionName = regionName.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
-      
-      Promise.all([
-        fetch(`/districts_${safeRegionName}.geojson`).then(res => {
-          if (!res.ok) throw new Error('Not found');
-          return res.json();
-        }),
-        fetchDistrictMapData(year && !isNaN(Number(year)) ? Number(year) : undefined, sector || undefined, regionName)
-      ])
-      .then(([geoData, distMapData]) => {
-        const normalizeName = (name: string) => name.toLowerCase().replace(/\s*(district|municipal|metropolitan|assembly)\s*/gi, '').trim();
-        const mapDataNormalized = Object.fromEntries(
-          Object.entries(distMapData).map(([k, v]) => [normalizeName(k), { originalName: k, ...v }])
-        );
-        geoData.features.forEach((f: any) => {
-          const name = normalizeName(f.properties.DISTRICT || f.properties.name || '');
-          let bd = mapDataNormalized[name];
-          if (!bd) {
-            // Fuzzy match fallback
-            const foundKey = Object.keys(mapDataNormalized).find(k => k.includes(name) || name.includes(k));
-            bd = foundKey ? mapDataNormalized[foundKey] : {};
-          }
-          if (bd.originalName) {
-            f.properties.DISTRICT = bd.originalName;
-          }
-          let total = 0;
-          Object.keys(GAS_COLORS).forEach(g => {
-            const val = bd[g] ? bd[g] : 0;
-            f.properties[g] = val;
-            total += val;
-          });
-          f.properties.TOTAL_EMISSIONS = total;
-          f.properties.dominant_gas = bd.dominant_gas !== 'None' ? bd.dominant_gas : 'CO2';
-        });
-        setDistrictData(geoData);
-        setActiveDistrictLayer(regionName);
-      })
-      .catch(e => console.error(e));
+      setActiveDistrictLayer(regionName);
+      setIsDistrictViewActive(true);
     }
   }, [year, sector]);
+
+  // Re-fetch district map data whenever region, year, or sector filter changes
+  useEffect(() => {
+    if (!activeDistrictLayer) return;
+
+    const safeRegionName = activeDistrictLayer.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
+    const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+
+    async function updateDistrictData() {
+      try {
+        let rawGeoData = geoJsonCache[safeRegionName];
+        if (!rawGeoData) {
+          const res = await fetch(`/districts_${safeRegionName}.geojson`);
+          if (!res.ok) throw new Error('Not found');
+          rawGeoData = await res.json();
+          geoJsonCache[safeRegionName] = rawGeoData;
+        }
+
+        const distMapData = await fetchDistrictMapData(y, sector || undefined, activeDistrictLayer || undefined);
+        const cleanStr = (s: string) => s.toLowerCase().replace(/\s*(district|municipal|metropolitan|assembly)\s*/gi, '').replace(/[^a-z0-9]/g, '').trim();
+        
+        const mapDataNormalized = Object.fromEntries(
+          Object.entries(distMapData).map(([k, v]) => [cleanStr(k), { originalName: k, ...v }])
+        );
+
+        const updatedFeatures = rawGeoData.features.map((f: any) => {
+          const rawName = String(f.properties.DISTRICT || f.properties.name || '').trim();
+          const mappedName = DISTRICT_ALIAS_MAP[rawName.toLowerCase()] || rawName;
+          const key = cleanStr(mappedName);
+
+          let bd = mapDataNormalized[key];
+          if (!bd) {
+            const foundKey = Object.keys(mapDataNormalized).find(k => k.includes(key) || key.includes(k));
+            bd = foundKey ? mapDataNormalized[foundKey] : {};
+          }
+
+          let total = bd.TOTAL_EMISSIONS !== undefined ? bd.TOTAL_EMISSIONS : 0;
+          const props: any = {
+            ...f.properties,
+            DISTRICT: bd.originalName || f.properties.DISTRICT || rawName,
+            TOTAL_EMISSIONS: total,
+            dominant_gas: bd.dominant_gas && bd.dominant_gas !== 'None' ? bd.dominant_gas : 'CO2'
+          };
+          Object.keys(GAS_COLORS).forEach(g => {
+            props[g] = bd[g] ? bd[g] : 0;
+          });
+          return {
+            ...f,
+            properties: props
+          };
+        });
+
+        setDistrictData({
+          type: 'FeatureCollection',
+          features: updatedFeatures
+        });
+      } catch (e) {
+        console.error('Failed to update district data on filter change', e);
+      }
+    }
+
+    updateDistrictData();
+  }, [activeDistrictLayer, year, sector]);
 
   useEffect(() => {
     if (activeDistrictLayer && viewState.zoom < 6.8 && !isZoomingToRegion) {
@@ -375,38 +402,25 @@ export default function Map() {
 
   const onClick = useCallback((event: any) => {
     const { features } = event;
-    const f = features?.[0];
+    const distFeature = features?.find((feat: any) => feat.source === 'ghana-districts');
     
-    if (event.features && event.features.length > 0 && event.features[0].source === 'ghana-districts') {
-        return;
+    if (distFeature && isDistrictViewActive) {
+      setActiveDistrict({
+        feature: distFeature,
+        longitude: event.lngLat.lng,
+        latitude: event.lngLat.lat
+      });
+      return;
     }
 
-    if (f && f.source === 'ghana-regions') {
-      zoomToRegion(f);
+    const regFeature = features?.find((feat: any) => feat.source === 'ghana-regions');
+    if (regFeature) {
+      zoomToRegion(regFeature);
     } else if (!activeDistrictLayer) {
       setClickedRegionInfo(null);
+      setActiveDistrict(null);
     }
-  }, [zoomToRegion, activeDistrictLayer]);
-
-  const onMouseMove = useCallback((event: any) => {
-    const { features } = event;
-    const f = features?.[0];
-    
-    if (f && f.source === 'ghana-districts' && isDistrictViewActive) {
-      setActiveDistrict(prev => {
-        if (prev?.feature?.properties?.DISTRICT === f.properties.DISTRICT) {
-          return prev;
-        }
-        return {
-          feature: f,
-          longitude: event.lngLat.lng,
-          latitude: event.lngLat.lat
-        };
-      });
-    } else {
-      setActiveDistrict(prev => prev ? null : prev);
-    }
-  }, [isDistrictViewActive]);
+  }, [zoomToRegion, activeDistrictLayer, isDistrictViewActive]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -432,8 +446,6 @@ export default function Map() {
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
         onClick={onClick}
-        onMouseMove={onMouseMove}
-        onMouseLeave={() => setActiveDistrict(null)}
         interactiveLayerIds={['regions-fill', 'districts-fill']}
         cursor="pointer"
         mapStyle="mapbox://styles/mapbox/light-v11"
@@ -464,7 +476,7 @@ export default function Map() {
         <Source 
           id="ghana-districts" 
           type="geojson" 
-          data={activeDistrictLayer ? (uniqueDistrictData || EMPTY_GEOJSON) : EMPTY_GEOJSON}
+          data={activeDistrictLayer ? (districtData || EMPTY_GEOJSON) : EMPTY_GEOJSON}
         >
           <Layer 
             id="districts-fill"
@@ -489,6 +501,20 @@ export default function Map() {
               visibility: isDistrictViewActive ? 'visible' : 'none'
             }}
           />
+          {activeDistrict?.feature && (
+            <Layer 
+              id="district-highlight"
+              type="line"
+              paint={{
+                'line-color': '#059669',
+                'line-width': 4,
+              }}
+              filter={['==', ['get', 'DISTRICT'], activeDistrict.feature.properties.DISTRICT]}
+              layout={{
+                visibility: isDistrictViewActive ? 'visible' : 'none'
+              }}
+            />
+          )}
         </Source>
 
         <Source 
@@ -536,8 +562,8 @@ export default function Map() {
                 transition={{ duration: 0.15, ease: 'easeOut' }}
               >
                 <DistrictPanel 
-                  districtName={activeDistrict.feature.properties.DISTRICT || activeDistrict.feature.properties.name || 'District'} 
-                  mapColor={getComputedColor(activeDistrict.feature.properties[gas || 'TOTAL_EMISSIONS'] || 0, districtBreakpoints || [])}
+                  districtName={currentDistrictFeature?.properties.DISTRICT || currentDistrictFeature?.properties.name || activeDistrict.feature.properties.DISTRICT || 'District'} 
+                  mapColor={getComputedColor(currentDistrictFeature?.properties[gas || 'TOTAL_EMISSIONS'] || 0, districtBreakpoints || [])}
                 />
               </motion.div>
             </Popup>
@@ -642,40 +668,45 @@ export default function Map() {
                       return Math.round(n).toLocaleString();
                     };
                     
-                    const tiers = isPerCapita 
+                    const tiers: { name?: string; range: string; color: string }[] = isPerCapita 
                       ? [
-                          { range: '< 0.72', color: '#1a9850' },
-                          { range: '0.72 – 1.43', color: '#91cf60' },
-                          { range: '1.43 – 2.15', color: '#fee08b' },
-                          { range: '2.15 – 3.58', color: '#fc8d59' },
-                          { range: '> 3.58', color: '#d73027' },
+                          { name: 'Very Low', range: '< 0.72', color: '#1a9850' },
+                          { name: 'Low', range: '0.72 – 1.43', color: '#66bd63' },
+                          { name: 'Moderate', range: '1.43 – 2.15', color: '#d9ef8b' },
+                          { name: 'High', range: '2.15 – 3.58', color: '#fee08b' },
+                          { name: 'Extreme Hotspot', range: '> 3.58', color: '#d73027' },
                         ]
                       : isDistrictViewActive
                       ? (districtBreakpoints ? [
-                          { range: `< ${formatNum(districtBreakpoints[0])}`, color: '#1a9850' },
-                          { range: `${formatNum(districtBreakpoints[0])} – ${formatNum(districtBreakpoints[1])}`, color: '#91cf60' },
-                          { range: `${formatNum(districtBreakpoints[1])} – ${formatNum(districtBreakpoints[2])}`, color: '#fee08b' },
-                          { range: `${formatNum(districtBreakpoints[2])} – ${formatNum(districtBreakpoints[3])}`, color: '#fc8d59' },
-                          { range: `> ${formatNum(districtBreakpoints[3])}`, color: '#d73027' },
+                          { name: 'Very Low', range: `≤ ${formatNum(districtBreakpoints[0])}`, color: '#1a9850' },
+                          { name: 'Low', range: `${formatNum(districtBreakpoints[0])} – ${formatNum(districtBreakpoints[1])}`, color: '#66bd63' },
+                          { name: 'Moderate', range: `${formatNum(districtBreakpoints[1])} – ${formatNum(districtBreakpoints[2])}`, color: '#d9ef8b' },
+                          { name: 'High', range: `${formatNum(districtBreakpoints[2])} – ${formatNum(districtBreakpoints[3])}`, color: '#fee08b' },
+                          { name: 'Very High', range: `${formatNum(districtBreakpoints[3])} – ${formatNum(districtBreakpoints[4])}`, color: '#fdae61' },
+                          { name: 'Severe', range: `${formatNum(districtBreakpoints[4])} – ${formatNum(districtBreakpoints[5])}`, color: '#f46d43' },
+                          { name: 'Extreme Hotspot', range: `> ${formatNum(districtBreakpoints[5])}`, color: '#d73027' },
                         ] : [
-                          { range: '< 50', color: '#1a9850' },
-                          { range: '50 – 150', color: '#91cf60' },
-                          { range: '150 – 300', color: '#fee08b' },
-                          { range: '300 – 600', color: '#fc8d59' },
-                          { range: '> 600', color: '#d73027' },
+                          { name: 'Very Low', range: '≤ 108', color: '#1a9850' },
+                          { name: 'Low', range: '108 – 133', color: '#66bd63' },
+                          { name: 'Moderate', range: '133 – 167', color: '#d9ef8b' },
+                          { name: 'High', range: '167 – 229', color: '#fee08b' },
+                          { name: 'Very High', range: '229 – 395', color: '#fdae61' },
+                          { name: 'Severe', range: '395 – 1,009', color: '#f46d43' },
+                          { name: 'Extreme Hotspot', range: '> 1,009', color: '#d73027' },
                         ])
                       : [
-                          { range: '< 1,493', color: '#1a9850' },
-                          { range: '1,493 – 2,985', color: '#91cf60' },
-                          { range: '2,985 – 4,478', color: '#fee08b' },
-                          { range: '4,478 – 7,463', color: '#fc8d59' },
-                          { range: '> 7,463', color: '#d73027' },
+                          { name: 'Very Low', range: '< 1,493', color: '#1a9850' },
+                          { name: 'Low', range: '1,493 – 2,985', color: '#91cf60' },
+                          { name: 'Moderate', range: '2,985 – 4,478', color: '#fee08b' },
+                          { name: 'High', range: '4,478 – 7,463', color: '#fc8d59' },
+                          { name: 'Extreme Hotspot', range: '> 7,463', color: '#d73027' },
                         ];
 
                     return tiers.map((tier, i) => (
                       <div key={i} className="flex items-center gap-2.5">
                         <span className="w-3.5 h-3.5 rounded-sm flex-shrink-0 shadow-sm border border-black/5" style={{ backgroundColor: tier.color }} />
                         <span className="text-[11px] text-gray-700 font-medium">
+                          {tier.name && <span className="font-semibold text-gray-800 mr-1">{tier.name}:</span>}
                           {tier.range} <span className="text-gray-400 text-[10px] ml-0.5">{unitLabel}</span>
                         </span>
                       </div>

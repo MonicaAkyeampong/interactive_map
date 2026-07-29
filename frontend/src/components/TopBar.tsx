@@ -7,8 +7,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import logo from '@/assets/logo.png';
 import { fetchAvailableFilters } from '@/lib/api';
+import { VALID_REGIONAL_YEARS } from '@/lib/constants';
 
-const YEARS = [1990, 2000, 2012, 2016, 2019, 2021, 2022];
+const YEARS = [...VALID_REGIONAL_YEARS];
 const GASES = ['CO2', 'CH4', 'N2O', 'HFC'];
 const SECTORS = ['Energy', 'Agriculture', 'LULUCF', 'IPPU', 'Waste'];
 const REGIONS = ['Ahafo', 'Ashanti', 'Bono', 'Bono East', 'Central', 'Eastern', 'Greater Accra', 'Northern', 'North East', 'Oti', 'Savannah', 'Upper East', 'Upper West', 'Volta', 'Western', 'Western North'];
@@ -34,23 +35,28 @@ function FilterSelect({
   options,
   available,
   onChange,
-  badge,
+  disabled,
+  tooltip,
 }: {
   label: string;
   value: string | number | null;
   options: (string | number)[];
   available: (string | number)[];
   onChange: (v: string | null) => void;
-  badge?: string;
+  disabled?: boolean;
+  tooltip?: string;
 }) {
   const active = value !== null && value !== '';
   return (
-    <div className="relative group">
+    <div className="relative group" title={disabled ? tooltip : undefined}>
       <select
-        className={`appearance-none border rounded-lg pl-3.5 pr-8 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all cursor-pointer min-w-[108px] ${
-          active
-            ? 'bg-[#00C853] text-white border-[#009624] shadow-sm shadow-emerald-200'
-            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+        disabled={disabled}
+        className={`appearance-none border rounded-lg pl-3.5 pr-8 py-2 text-xs font-medium focus:outline-none transition-all min-w-[108px] ${
+          disabled
+            ? 'bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed opacity-75'
+            : active
+            ? 'bg-[#00C853] text-white border-[#009624] shadow-sm shadow-emerald-200 cursor-pointer'
+            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 cursor-pointer'
         }`}
         value={value ?? ''}
         onChange={e => onChange(e.target.value || null)}
@@ -62,13 +68,13 @@ function FilterSelect({
           </option>
         ))}
       </select>
-      <ChevronDown className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none transition-colors ${active ? 'text-white/80' : 'text-gray-400'}`} />
+      <ChevronDown className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none transition-colors ${disabled ? 'text-gray-300' : active ? 'text-white/80' : 'text-gray-400'}`} />
     </div>
   );
 }
 
 export default function TopBar() {
-  const { year, gas, sector, setYear, setGas, setSector, setSearchedRegion } = useStore();
+  const { year, gas, sector, isDistrictViewActive, setYear, setGas, setSector, setSearchedRegion } = useStore();
   const [availableYears, setAvailableYears] = useState<number[]>(YEARS);
   const [availableGases, setAvailableGases] = useState<string[]>(GASES);
   const [availableSectors, setAvailableSectors] = useState<string[]>(SECTORS);
@@ -79,20 +85,21 @@ export default function TopBar() {
   useEffect(() => {
     async function loadFilters() {
       try {
-        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
-        const filters = await fetchAvailableFilters(y, gas || undefined, sector || undefined);
-        setAvailableYears(filters.years);
-        setAvailableGases(filters.gases);
-        setAvailableSectors(filters.sectors);
-        if (y && !filters.years.includes(y)) setYear(null);
-        if (gas && !filters.gases.includes(gas)) setGas(null);
-        if (sector && !filters.sectors.includes(sector)) setSector(null);
+        setAvailableYears(YEARS);
+
+        const gasFilters = await fetchAvailableFilters(undefined, undefined, sector || undefined);
+        setAvailableGases(gasFilters.gases.length > 0 ? gasFilters.gases : GASES);
+
+        const sectorFilters = await fetchAvailableFilters(undefined, gas || undefined, undefined);
+        setAvailableSectors(sectorFilters.sectors.length > 0 ? sectorFilters.sectors : SECTORS);
       } catch {
-        // keep current options on error
+        setAvailableYears(YEARS);
+        setAvailableGases(GASES);
+        setAvailableSectors(SECTORS);
       }
     }
     loadFilters();
-  }, [year, gas, sector, setYear, setGas, setSector]);
+  }, [gas, sector]);
 
   const activeCount = [year, gas, sector].filter(Boolean).length;
 
@@ -139,6 +146,8 @@ export default function TopBar() {
           options={GASES}
           available={availableGases}
           onChange={setGas}
+          disabled={isDistrictViewActive}
+          tooltip="Gas breakdown is displayed inside the district popup"
         />
         <FilterSelect
           label="Sector"
@@ -146,6 +155,8 @@ export default function TopBar() {
           options={SECTORS}
           available={availableSectors}
           onChange={setSector}
+          disabled={isDistrictViewActive}
+          tooltip="Sector breakdown is displayed inside the district popup"
         />
 
         {activeCount > 0 && (
