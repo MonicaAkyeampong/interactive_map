@@ -8,6 +8,7 @@ export const VALID_REGIONAL_YEARS = [1990, 2000, 2012, 2016, 2019, 2021, 2022] a
 export type RegionalYear = typeof VALID_REGIONAL_YEARS[number];
 
 export const DISTRICT_BREAKDOWN_YEAR = 2022;
+export const DEFAULT_YEAR = 2022;
 
 /**
  * Checks if sector and gas breakdown detail is available for a given year at the district level.

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DEFAULT_YEAR } from '@/lib/constants';
 
 interface FilterState {
   year: number | null;
@@ -24,7 +25,7 @@ interface FilterState {
 }
 
 export const useStore = create<FilterState>((set) => ({
-  year: null,
+  year: DEFAULT_YEAR,
   gas: null,
   sector: null,
   forecastMode: 'Future Forecasts',

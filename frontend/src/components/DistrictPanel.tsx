@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { fetchDistrictSummaryData } from '@/lib/api';
-import { isDistrictBreakdownAvailable } from '@/lib/constants';
+import { isDistrictBreakdownAvailable, DEFAULT_YEAR } from '@/lib/constants';
 import { Info } from 'lucide-react';
 
 const cache: Record<string, any> = {};
@@ -35,7 +35,7 @@ export default function DistrictPanel({ districtName, mapColor }: { districtName
     
     async function loadData() {
       try {
-        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const y = year && !isNaN(Number(year)) ? Number(year) : DEFAULT_YEAR;
         const result = await fetchDistrictSummaryData(y, gas || undefined, sector || undefined, districtName);
         cache[cacheKey] = result;
         if (isMounted) {
@@ -94,7 +94,7 @@ export default function DistrictPanel({ districtName, mapColor }: { districtName
         {/* Key Metrics */}
         <div className="grid grid-cols-2 gap-2 bg-gray-50/60 p-2 rounded-lg border border-gray-100">
           <div>
-            <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Total ({year || '2022'})</div>
+            <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Total ({year || DEFAULT_YEAR})</div>
             <div className="font-extrabold text-gray-900 text-sm">
               {data.total_emissions.toLocaleString(undefined, { maximumFractionDigits: 1 })}
               <span className="text-[9px] text-gray-400 font-normal ml-0.5">kt</span>

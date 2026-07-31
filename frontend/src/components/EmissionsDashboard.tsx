@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
 import { fetchEmissions, fetchRegions, fetchGases, fetchSummaryData, Emission, Region, Gas } from '@/lib/api';
-import { VALID_REGIONAL_YEARS } from '@/lib/constants';
+import { VALID_REGIONAL_YEARS, DEFAULT_YEAR } from '@/lib/constants';
 import { Database, MapPin, Layers, TrendingUp } from 'lucide-react';
 
 interface SummaryData {
@@ -75,7 +75,7 @@ export default function EmissionsDashboard() {
 
   const [selectedRegion, setSelectedRegion] = useState<number | ''>('');
   const [selectedGas, setSelectedGas] = useState<number | ''>('');
-  const [selectedYear, setSelectedYear] = useState<number | ''>('');
+  const [selectedYear, setSelectedYear] = useState<number | ''>(DEFAULT_YEAR);
   const [loading, setLoading] = useState(true);
 
   const reducedMotion = useReducedMotion() ?? false;

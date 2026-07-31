@@ -7,7 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import logo from '@/assets/logo.png';
 import { fetchAvailableFilters } from '@/lib/api';
-import { VALID_REGIONAL_YEARS } from '@/lib/constants';
+import { VALID_REGIONAL_YEARS, DEFAULT_YEAR } from '@/lib/constants';
 
 const YEARS = [...VALID_REGIONAL_YEARS];
 const GASES = ['CO2', 'CH4', 'N2O', 'HFC'];
@@ -15,10 +15,13 @@ const SECTORS = ['Energy', 'Agriculture', 'LULUCF', 'IPPU', 'Waste'];
 const REGIONS = ['Ahafo', 'Ashanti', 'Bono', 'Bono East', 'Central', 'Eastern', 'Greater Accra', 'Northern', 'North East', 'Oti', 'Savannah', 'Upper East', 'Upper West', 'Volta', 'Western', 'Western North'];
 
 const GAS_COLORS: Record<string, string> = {
-  CO2: 'bg-blue-100 text-blue-700 border-blue-200',
-  CH4: 'bg-orange-100 text-orange-700 border-orange-200',
-  N2O: 'bg-purple-100 text-purple-700 border-purple-200',
+  CO2: 'bg-red-100 text-red-700 border-red-200',
+  CH4: 'bg-rose-950/10 text-rose-900 border-rose-900/20',
+  N2O: 'bg-orange-100 text-orange-700 border-orange-200',
   HFC: 'bg-lime-100 text-lime-700 border-lime-200',
+  SF6: 'bg-amber-100 text-amber-700 border-amber-200',
+  CFC: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  PFC: 'bg-rose-100 text-rose-700 border-rose-200',
 };
 
 const SECTOR_COLORS: Record<string, string> = {
@@ -104,7 +107,7 @@ export default function TopBar() {
   const activeCount = [year, gas, sector].filter(Boolean).length;
 
   function clearAll() {
-    setYear(null);
+    setYear(DEFAULT_YEAR);
     setGas(null);
     setSector(null);
   }
@@ -135,10 +138,10 @@ export default function TopBar() {
       <div className="flex items-center gap-2 flex-shrink-0">
         <FilterSelect
           label="Year"
-          value={year}
+          value={year ?? DEFAULT_YEAR}
           options={YEARS}
           available={availableYears}
-          onChange={v => setYear(v ? parseInt(v) : null)}
+          onChange={v => setYear(v ? parseInt(v) : DEFAULT_YEAR)}
         />
         <FilterSelect
           label="Gas Type"

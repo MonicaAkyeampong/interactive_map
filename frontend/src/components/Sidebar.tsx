@@ -1,10 +1,11 @@
 'use client';
 
 import { useStore } from '@/store/useStore';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { TrendingUp, MapPin, BarChart2, Activity } from 'lucide-react';
 import { fetchSummaryData } from '@/lib/api';
+import { DEFAULT_YEAR } from '@/lib/constants';
 
 interface SummaryData {
   total_emissions: number;
@@ -54,7 +55,7 @@ export default function Sidebar() {
     async function load() {
       setLoading(true);
       try {
-        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const y = year && !isNaN(Number(year)) ? Number(year) : DEFAULT_YEAR;
         const summary = await fetchSummaryData(y, gas || undefined, sector || undefined);
         setData({
           total_emissions: summary.total_emissions,
@@ -74,13 +75,15 @@ export default function Sidebar() {
 
   const topSectors = data?.sector_breakdown?.slice(0, 4) ?? [];
   const maxSector = topSectors[0]?.total ?? 1;
-  const formatted = data
-    ? data.total_emissions >= 1_000_000
-      ? `${(data.total_emissions / 1_000_000).toFixed(2)}M`
-      : data.total_emissions >= 1_000
-        ? `${(data.total_emissions / 1_000).toFixed(1)}K`
-        : data.total_emissions.toLocaleString(undefined, { maximumFractionDigits: 1 })
-    : null;
+  
+  const { formatted, displayUnit } = useMemo(() => {
+    if (!data) return { formatted: null, displayUnit: 'kt CO₂e' };
+    const val = data.total_emissions;
+    if (val >= 100_000) {
+      return { formatted: (val / 1_000).toFixed(1), displayUnit: 'Mt CO₂e' };
+    }
+    return { formatted: Math.round(val).toLocaleString(), displayUnit: 'kt CO₂e' };
+  }, [data]);
 
   return (
     <motion.div
@@ -107,7 +110,7 @@ export default function Sidebar() {
             </span>
           </div>
           <p className="text-[10px] text-gray-400 font-medium">
-            {year ? `Year ${year}` : 'All Years'} · {sector || 'All Sectors'} · {intervals[activeTimelineIndex]}
+            Year {year || DEFAULT_YEAR} · {sector || 'All Sectors'} · {intervals[activeTimelineIndex]}
           </p>
         </div>
 
@@ -122,7 +125,7 @@ export default function Sidebar() {
             <>
               <div className="flex items-end gap-1.5 mb-0.5">
                 <span className="text-3xl font-bold tracking-tight text-gray-900 leading-none">{formatted ?? '—'}</span>
-                <span className="text-sm font-semibold text-gray-400 mb-0.5">{data?.unit ?? 'ktCO2e'}</span>
+                <span className="text-sm font-semibold text-gray-400 mb-0.5">{displayUnit}</span>
               </div>
               <p className="text-[10px] text-gray-400 mb-3">{data?.total_sources?.toLocaleString()} data records</p>
 

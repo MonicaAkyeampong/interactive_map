@@ -34,10 +34,13 @@ export default function GasProfileTable({ data, maxItems }: Props) {
   
   // Colors for percentage bars
   const GAS_COLORS: Record<string, string> = {
-    'CO2': 'bg-blue-500',
-    'CH4': 'bg-amber-500',
-    'N2O': 'bg-red-500',
-    'HFC': 'bg-purple-500',
+    'CO2': 'bg-red-500',
+    'CH4': 'bg-[#800020]',
+    'N2O': 'bg-orange-500',
+    'HFC': 'bg-lime-500',
+    'SF6': 'bg-amber-500',
+    'CFC': 'bg-cyan-500',
+    'PFC': 'bg-rose-500',
   };
 
   return (

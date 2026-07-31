@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { fetchSummaryData } from '@/lib/api';
+import { DEFAULT_YEAR } from '@/lib/constants';
 import { Building2 } from 'lucide-react';
 
 const cache: Record<string, any> = {};
@@ -34,7 +35,7 @@ export default function HoverRegionDetails({
     
     async function loadData() {
       try {
-        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const y = year && !isNaN(Number(year)) ? Number(year) : DEFAULT_YEAR;
         const result = await fetchSummaryData(y, gas || undefined, sector || undefined, regionName);
         cache[cacheKey] = result;
         if (isMounted) {
@@ -81,7 +82,7 @@ export default function HoverRegionDetails({
         {/* Overview */}
         <div className="space-y-1">
           <div className="flex justify-between items-center text-[10px]">
-            <span className="text-gray-500 font-medium">Total Em. ({year || 'All Yrs'})</span>
+            <span className="text-gray-500 font-medium">Total Em. ({year || DEFAULT_YEAR})</span>
             <span className="font-bold text-gray-800">
               {data.total_emissions.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-[9px] text-gray-400 font-normal">kt</span>
             </span>

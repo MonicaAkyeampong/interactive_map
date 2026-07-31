@@ -5,6 +5,8 @@ import MapboxMap, { Source, Layer, Popup, MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useStore } from '@/store/useStore';
 import { fetchMapData, fetchDistrictMapData } from '@/lib/api';
+import { DEFAULT_YEAR } from '@/lib/constants';
+import { getRegionalShades, getRegionalFillColorExpression, GAS_PALETTES } from '@/lib/colorUtils';
 import { Play, Pause, Plus, Minus, Layers, ChevronDown, HelpCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import HoverRegionDetails from './RegionPanel';
@@ -13,13 +15,13 @@ import DistrictPanel from './DistrictPanel';
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 const GAS_COLORS: Record<string, string> = {
-  CO2: '#3b82f6',
-  N2O: '#a855f7',
-  CH4: '#f97316',
-  SF6: '#eab308',
-  CFC: '#06b6d4',
-  PFC: '#f43f5e',
-  HFC: '#84cc16',
+  CO2: GAS_PALETTES.CO2.hexPrimary,
+  CH4: GAS_PALETTES.CH4.hexPrimary,
+  N2O: GAS_PALETTES.N2O.hexPrimary,
+  HFC: GAS_PALETTES.HFC.hexPrimary,
+  SF6: GAS_PALETTES.SF6.hexPrimary,
+  CFC: GAS_PALETTES.CFC.hexPrimary,
+  PFC: GAS_PALETTES.PFC.hexPrimary,
 };
 
 const GAS_LABELS: Record<string, string> = {
@@ -85,7 +87,7 @@ const EMPTY_GEOJSON: any = { type: 'FeatureCollection', features: [] };
 const geoJsonCache: Record<string, any> = {};
 
 function getComputedColor(val: number, bps: number[]) {
-  if (!bps || bps.length < 6) bps = [108, 133, 167, 229, 395, 1009];
+  if (!bps || bps.length < 6) bps = [140, 220, 390, 830, 1500, 3000];
   if (val <= bps[0]) return '#1a9850'; // Very Low
   if (val <= bps[1]) return '#66bd63'; // Low
   if (val <= bps[2]) return '#d9ef8b'; // Moderate
@@ -163,9 +165,9 @@ export default function Map() {
     ) || activeDistrict.feature;
   }, [activeDistrict, districtData]);
 
-  // Fixed 7-class adaptive percentile breakpoints derived from benchmark dataset (P20, P40, P60, P80, P95, P99)
+  // Jenks Natural Breaks classification for District layer
   const districtBreakpoints = useMemo(() => {
-    return [108, 133, 167, 229, 395, 1009];
+    return [140, 220, 390, 830, 1500, 3000];
   }, []);
 
   const districtFillColor = useMemo(() => {
@@ -248,7 +250,7 @@ export default function Map() {
     if (!activeDistrictLayer) return;
 
     const safeRegionName = activeDistrictLayer.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
-    const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+    const y = year && !isNaN(Number(year)) ? Number(year) : DEFAULT_YEAR;
 
     async function updateDistrictData() {
       try {
@@ -331,7 +333,7 @@ export default function Map() {
   useEffect(() => {
     async function loadData() {
       try {
-        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const y = year && !isNaN(Number(year)) ? Number(year) : DEFAULT_YEAR;
         const [geoRes, mapData] = await Promise.all([
           fetch('/ghana.geojson').then(r => r.json()),
           fetchMapData(y, sector || undefined),
@@ -365,7 +367,7 @@ export default function Map() {
   useEffect(() => {
     async function loadNationalDistrictData() {
       try {
-        const y = year && !isNaN(Number(year)) ? Number(year) : undefined;
+        const y = year && !isNaN(Number(year)) ? Number(year) : DEFAULT_YEAR;
         const data = await fetchDistrictMapData(y, sector || undefined);
         setNationalDistrictMapData(data);
       } catch (err) {
@@ -375,20 +377,14 @@ export default function Map() {
     loadNationalDistrictData();
   }, [year, sector]);
 
-  const fillStyle: any = {
+  const fillStyle: any = useMemo(() => ({
     id: 'regions-fill',
     type: 'fill',
     paint: {
-      'fill-color': ['step', ['get', gas || 'TOTAL_EMISSIONS'],
-        '#31A354', // Dark green: < 1482
-        1482, '#A1D99B', // Light green: 1482 - 2985
-        2985, '#FEE08B', // Yellow: 2985 - 4478
-        4478, '#FDAE61', // Orange: 4478 - 7463
-        7463, '#D73027' // Red: > 7463
-      ],
+      'fill-color': getRegionalFillColorExpression(gas),
       'fill-opacity': isDistrictViewActive ? 0.05 : 0.72,
     },
-  };
+  }), [gas, isDistrictViewActive]);
 
   const lineStyle: any = {
     id: 'regions-line',
@@ -686,21 +682,24 @@ export default function Map() {
                           { name: 'Severe', range: `${formatNum(districtBreakpoints[4])} – ${formatNum(districtBreakpoints[5])}`, color: '#f46d43' },
                           { name: 'Extreme Hotspot', range: `> ${formatNum(districtBreakpoints[5])}`, color: '#d73027' },
                         ] : [
-                          { name: 'Very Low', range: '≤ 108', color: '#1a9850' },
-                          { name: 'Low', range: '108 – 133', color: '#66bd63' },
-                          { name: 'Moderate', range: '133 – 167', color: '#d9ef8b' },
-                          { name: 'High', range: '167 – 229', color: '#fee08b' },
-                          { name: 'Very High', range: '229 – 395', color: '#fdae61' },
-                          { name: 'Severe', range: '395 – 1,009', color: '#f46d43' },
-                          { name: 'Extreme Hotspot', range: '> 1,009', color: '#d73027' },
+                          { name: 'Very Low', range: '≤ 140', color: '#1a9850' },
+                          { name: 'Low', range: '140 – 220', color: '#66bd63' },
+                          { name: 'Moderate', range: '220 – 390', color: '#d9ef8b' },
+                          { name: 'High', range: '390 – 830', color: '#fee08b' },
+                          { name: 'Very High', range: '830 – 1,500', color: '#fdae61' },
+                          { name: 'Severe', range: '1,500 – 3,000', color: '#f46d43' },
+                          { name: 'Extreme Hotspot', range: '> 3,000', color: '#d73027' },
                         ])
-                      : [
-                          { name: 'Very Low', range: '< 1,493', color: '#1a9850' },
-                          { name: 'Low', range: '1,493 – 2,985', color: '#91cf60' },
-                          { name: 'Moderate', range: '2,985 – 4,478', color: '#fee08b' },
-                          { name: 'High', range: '4,478 – 7,463', color: '#fc8d59' },
-                          { name: 'Extreme Hotspot', range: '> 7,463', color: '#d73027' },
-                        ];
+                      : (() => {
+                          const regShades = getRegionalShades(gas);
+                          return [
+                            { name: 'Very Low', range: '< 1,493', color: regShades[0] },
+                            { name: 'Low', range: '1,493 – 2,985', color: regShades[1] },
+                            { name: 'Moderate', range: '2,985 – 4,478', color: regShades[2] },
+                            { name: 'High', range: '4,478 – 7,463', color: regShades[3] },
+                            { name: 'Extreme Hotspot', range: '> 7,463', color: regShades[4] },
+                          ];
+                        })();
 
                     return tiers.map((tier, i) => (
                       <div key={i} className="flex items-center gap-2.5">

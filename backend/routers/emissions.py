@@ -58,6 +58,9 @@ def get_summary(
 ):
     from sqlalchemy import func
     
+    if not year:
+        year = 2022
+        
     # Resolve names to IDs if provided
     if gas_name:
         gas_obj = db.query(models.Gas).filter(models.Gas.formula == gas_name).first()
@@ -162,6 +165,9 @@ def get_map_data(
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import func
+    
+    if not year:
+        year = 2022
     
     if sector_name:
         sector_obj = db.query(models.Sector).filter(models.Sector.sector_name == sector_name).first()
@@ -316,6 +322,9 @@ def get_district_map_data(
 ):
     from sqlalchemy import func
     
+    if not year:
+        year = 2022
+    
     if sector_name:
         sector_obj = db.query(models.Sector).filter(models.Sector.sector_name == sector_name).first()
         if sector_obj:
@@ -390,6 +399,9 @@ def get_district_summary(
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import func
+    
+    if not year:
+        year = 2022
     
     if gas_name:
         gas_obj = db.query(models.Gas).filter(models.Gas.formula == gas_name).first()
