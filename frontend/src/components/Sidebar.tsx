@@ -2,8 +2,8 @@
 
 import { useStore } from '@/store/useStore';
 import { useEffect, useState, useMemo } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
-import { TrendingUp, MapPin, BarChart2, Activity } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { TrendingUp, MapPin, BarChart2, Activity, ChevronDown, X, BarChart3 } from 'lucide-react';
 import { fetchSummaryData } from '@/lib/api';
 import { DEFAULT_YEAR } from '@/lib/constants';
 
@@ -49,6 +49,7 @@ export default function Sidebar() {
   const intervals = ['24hrs', '48hrs', '72hrs', '1 week', '1 month'];
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const reducedMotion = useReducedMotion() ?? false;
 
   useEffect(() => {
@@ -85,18 +86,10 @@ export default function Sidebar() {
     return { formatted: Math.round(val).toLocaleString(), displayUnit: 'kt CO₂e' };
   }, [data]);
 
-  return (
-    <motion.div
-      variants={containerVariants}
-      initial={reducedMotion ? false : 'hidden'}
-      animate="visible"
-      className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-64 flex flex-col gap-2.5"
-    >
+  const renderStatsContent = () => (
+    <>
       {/* Main stats card */}
-      <motion.div
-        variants={itemVariants}
-        className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.14)] border border-gray-100 overflow-hidden"
-      >
+      <div className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.14)] border border-gray-100 overflow-hidden">
         {/* Card header */}
         <div className="px-4 pt-4 pb-3 border-b border-gray-50">
           <div className="flex items-center justify-between mb-0.5">
@@ -158,20 +151,11 @@ export default function Sidebar() {
             </>
           )}
         </div>
-      </motion.div>
+      </div>
 
       {/* Stat mini-cards */}
-      <div className="grid grid-cols-2 gap-2">
-        <motion.div
-          variants={itemVariants}
-          whileHover={
-            reducedMotion
-              ? {}
-              : { y: -4, boxShadow: '0 12px 36px rgba(0,0,0,0.12)' }
-          }
-          transition={{ duration: 0.2 }}
-          className="bg-white/97 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 p-3 cursor-default"
-        >
+      <div className="grid grid-cols-2 gap-2 mt-2.5">
+        <div className="bg-white/97 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
             <MapPin className="w-3 h-3 text-gray-400" />
             <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Top Region</span>
@@ -183,18 +167,9 @@ export default function Sidebar() {
               {data?.top_region || '—'}
             </p>
           )}
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={itemVariants}
-          whileHover={
-            reducedMotion
-              ? {}
-              : { y: -4, boxShadow: '0 12px 36px rgba(0,0,0,0.12)' }
-          }
-          transition={{ duration: 0.2 }}
-          className="bg-white/97 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 p-3 cursor-default"
-        >
+        <div className="bg-white/97 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Activity className="w-3 h-3 text-gray-400" />
             <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Trend</span>
@@ -206,18 +181,9 @@ export default function Sidebar() {
               <TrendingUp className="w-3 h-3" /> Analysing
             </p>
           )}
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={itemVariants}
-          whileHover={
-            reducedMotion
-              ? {}
-              : { y: -4, boxShadow: '0 12px 36px rgba(0,0,0,0.12)' }
-          }
-          transition={{ duration: 0.2 }}
-          className="bg-white/97 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 p-3 col-span-2 cursor-default"
-        >
+        <div className="bg-white/97 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 p-3 col-span-2">
           <div className="flex items-center gap-1.5 mb-1.5">
             <BarChart2 className="w-3 h-3 text-gray-400" />
             <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Forecast Variance</span>
@@ -227,8 +193,71 @@ export default function Sidebar() {
           ) : (
             <p className="text-xs font-bold text-gray-700">± Pending model</p>
           )}
-        </motion.div>
+        </div>
       </div>
-    </motion.div>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar (hidden on mobile) */}
+      <motion.div
+        variants={containerVariants}
+        initial={reducedMotion ? false : 'hidden'}
+        animate="visible"
+        className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-10 w-64 flex-col gap-2.5"
+      >
+        {renderStatsContent()}
+      </motion.div>
+
+      {/* Mobile Overview Pill Trigger */}
+      <div className="md:hidden absolute top-16 left-3 z-20">
+        <button
+          onClick={() => setIsMobileSheetOpen(true)}
+          className="flex items-center gap-2 bg-white/95 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-gray-100 text-xs font-bold text-gray-800 active:scale-95 transition-transform"
+        >
+          <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+          <span>{loading ? 'Overview' : `${formatted} ${displayUnit}`}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+        </button>
+      </div>
+
+      {/* Mobile Stats Bottom Sheet Drawer */}
+      <AnimatePresence>
+        {isMobileSheetOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-end justify-center p-0 md:hidden"
+            onClick={() => setIsMobileSheetOpen(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white w-full rounded-t-3xl shadow-2xl p-4 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-sm font-bold text-gray-800">Emissions Overview</h3>
+                </div>
+                <button
+                  onClick={() => setIsMobileSheetOpen(false)}
+                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {renderStatsContent()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

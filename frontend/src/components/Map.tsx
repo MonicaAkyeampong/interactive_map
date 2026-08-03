@@ -386,13 +386,23 @@ export default function Map() {
     },
   }), [gas, isDistrictViewActive]);
 
+  const lineStyleCasing: any = {
+    id: 'regions-line-casing',
+    type: 'line',
+    paint: {
+      'line-color': '#ffffff',
+      'line-opacity': 0.7,
+      'line-width': 2.0,
+    },
+  };
+
   const lineStyle: any = {
     id: 'regions-line',
     type: 'line',
     paint: {
-      'line-color': '#ffffff',
-      'line-opacity': 0.6,
-      'line-width': 1,
+      'line-color': '#1e293b',
+      'line-opacity': 0.85,
+      'line-width': 1.0,
     },
   };
 
@@ -454,14 +464,16 @@ export default function Map() {
         {geoData && (
           <Source id="ghana-regions" type="geojson" data={geoData}>
             <Layer {...fillStyle} />
+            <Layer {...lineStyleCasing} />
             <Layer {...lineStyle} />
             {clickedRegionInfo?.feature && (
               <Layer
                 id="region-highlight"
                 type="line"
                 paint={{
-                  'line-color': '#ffffff',
+                  'line-color': '#059669',
                   'line-width': 4,
+                  'line-opacity': 1,
                 }}
                 filter={['==', ['get', 'REGION'], clickedRegionInfo.feature.properties.REGION]}
               />
@@ -486,12 +498,24 @@ export default function Map() {
             }}
           />
           <Layer 
-            id="districts-line"
+            id="districts-line-casing"
             type="line"
             paint={{
               'line-color': '#ffffff',
-              'line-width': 2,
-              'line-opacity': 0.8
+              'line-width': 1.8,
+              'line-opacity': 0.6
+            }}
+            layout={{
+              visibility: isDistrictViewActive ? 'visible' : 'none'
+            }}
+          />
+          <Layer 
+            id="districts-line"
+            type="line"
+            paint={{
+              'line-color': '#334155',
+              'line-width': 0.8,
+              'line-opacity': 0.85
             }}
             layout={{
               visibility: isDistrictViewActive ? 'visible' : 'none'
@@ -570,13 +594,13 @@ export default function Map() {
       <AnimatePresence>
         {clickedRegionInfo?.feature && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="absolute top-6 right-6 z-20 w-[300px] shadow-2xl rounded-2xl overflow-hidden bg-white/97 backdrop-blur-md border border-gray-100"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed md:absolute inset-x-0 bottom-0 md:bottom-auto md:top-6 md:right-6 md:left-auto z-40 md:z-20 w-full md:w-[300px] max-h-[85vh] overflow-y-auto shadow-2xl rounded-t-3xl md:rounded-2xl overflow-hidden bg-white/97 backdrop-blur-md border border-gray-100"
           >
             {/* Header with Back button */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-100 bg-gray-50/80">
+            <div className="flex items-center justify-between p-3 border-b border-gray-100 bg-gray-50/80 sticky top-0 bg-white z-10">
               <button 
                 onClick={() => {
                   setActiveDistrictLayer(null);
@@ -595,6 +619,14 @@ export default function Map() {
               >
                 <span>←</span> Back to National
               </button>
+
+              {/* Mobile Close Button */}
+              <button
+                onClick={() => setClickedRegionInfo(null)}
+                className="md:hidden text-xs font-bold text-gray-400 hover:text-gray-700 px-2 py-1"
+              >
+                Close ✕
+              </button>
             </div>
             <div className="p-1">
               <HoverRegionDetails 
@@ -608,40 +640,40 @@ export default function Map() {
       </AnimatePresence>
 
       {/* ── Zoom Controls ── */}
-      <div className="absolute right-6 bottom-6 flex flex-col gap-1.5 z-10">
+      <div className="absolute right-3 md:right-6 top-16 md:top-auto md:bottom-6 flex flex-col gap-1.5 z-10">
         <button
           onClick={() => setViewState(p => ({ ...p, zoom: Math.min(p.zoom + 1, 18) }))}
-          className="w-9 h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
+          className="w-8 h-8 md:w-9 md:h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
         >
           <Plus className="w-4 h-4" />
         </button>
         <button
           onClick={() => setViewState(p => ({ ...p, zoom: Math.max(p.zoom - 1, 1) }))}
-          className="w-9 h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
+          className="w-8 h-8 md:w-9 md:h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
         >
           <Minus className="w-4 h-4" />
         </button>
       </div>
 
       {/* ── Legend Container ── */}
-      <div className="absolute bottom-6 right-20 z-10 flex items-end gap-3">
+      <div className="absolute bottom-16 md:bottom-6 right-3 md:right-20 z-10 flex items-end gap-2 md:gap-3">
         
         {/* How to Use Button */}
         <button
           onClick={() => setIsHowToOpen(true)}
-          className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 p-3 hover:bg-gray-50/80 transition-colors flex items-center justify-center h-11"
+          className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 p-2.5 md:p-3 hover:bg-gray-50/80 transition-colors flex items-center justify-center h-9 md:h-11"
           title="How to use the map"
         >
-          <HelpCircle className="w-5 h-5 text-gray-500 hover:text-brand-600 transition-colors" />
+          <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 hover:text-brand-600 transition-colors" />
         </button>
 
         {/* Legend */}
-        <div className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 overflow-hidden min-w-[200px]">
+        <div className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 overflow-hidden min-w-[170px] sm:min-w-[200px]">
           <button
-            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/80 transition-colors border-b border-gray-50 h-11"
+            className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50/80 transition-colors border-b border-gray-50 h-9 sm:h-11"
             onClick={() => setIsLegendOpen(!isLegendOpen)}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Layers className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-xs font-semibold text-gray-700">Map Legend</span>
             </div>
@@ -650,11 +682,11 @@ export default function Map() {
 
           {isLegendOpen && (
             <div>
-              <div className="px-4 py-3">
-                <p className="text-[10px] text-gray-400 font-medium mb-3 uppercase tracking-wider">
+              <div className="px-3 sm:px-4 py-2.5 sm:py-3">
+                <p className="text-[10px] text-gray-400 font-medium mb-2.5 uppercase tracking-wider">
                   {gas ? `${gas} Emission Level` : 'Total Emission Level'}
                 </p>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5 sm:gap-2">
                   {(() => {
                     const isPerCapita = false; // Toggle left out for now
                     const unitLabel = isPerCapita ? 't CO₂e/capita/yr' : 'kt CO₂e/yr';
@@ -702,11 +734,11 @@ export default function Map() {
                         })();
 
                     return tiers.map((tier, i) => (
-                      <div key={i} className="flex items-center gap-2.5">
-                        <span className="w-3.5 h-3.5 rounded-sm flex-shrink-0 shadow-sm border border-black/5" style={{ backgroundColor: tier.color }} />
-                        <span className="text-[11px] text-gray-700 font-medium">
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-sm flex-shrink-0 shadow-sm border border-black/5" style={{ backgroundColor: tier.color }} />
+                        <span className="text-[10px] sm:text-[11px] text-gray-700 font-medium">
                           {tier.name && <span className="font-semibold text-gray-800 mr-1">{tier.name}:</span>}
-                          {tier.range} <span className="text-gray-400 text-[10px] ml-0.5">{unitLabel}</span>
+                          {tier.range} <span className="text-gray-400 text-[9px] sm:text-[10px] ml-0.5">{unitLabel}</span>
                         </span>
                       </div>
                     ));
@@ -719,12 +751,12 @@ export default function Map() {
       </div>
 
       {/* ── Timeline ── */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-        <div className="flex items-center gap-2 bg-white/97 backdrop-blur-xl px-3 py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100">
+      <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-24px)] sm:w-auto max-w-lg">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-white/97 backdrop-blur-xl px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 overflow-x-auto no-scrollbar">
           {/* Play/Pause */}
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all shadow-sm ${
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all shadow-sm ${
               isPlaying
                 ? 'bg-gray-800 text-white hover:bg-gray-900'
                 : 'bg-brand-500 text-white hover:bg-brand-600'
@@ -733,7 +765,7 @@ export default function Map() {
             {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
           </button>
 
-          <div className="w-px h-5 bg-gray-100" />
+          <div className="w-px h-4 sm:h-5 bg-gray-100 flex-shrink-0" />
 
           {/* Forecast mode */}
           <div className="flex items-center bg-gray-50 rounded-xl p-0.5 flex-shrink-0">
@@ -741,7 +773,7 @@ export default function Map() {
               <button
                 key={mode}
                 onClick={() => setForecastMode(mode)}
-                className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                className={`px-2 sm:px-2.5 py-1 sm:py-1.5 text-[9px] sm:text-[10px] font-bold rounded-lg transition-all ${
                   forecastMode === mode
                     ? 'bg-white text-brand-700 shadow-sm'
                     : 'text-gray-400 hover:text-gray-600'
@@ -752,15 +784,15 @@ export default function Map() {
             ))}
           </div>
 
-          <div className="w-px h-5 bg-gray-100" />
+          <div className="w-px h-4 sm:h-5 bg-gray-100 flex-shrink-0" />
 
           {/* Interval pills */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             {intervals.map((iv, idx) => (
               <button
                 key={iv}
                 onClick={() => { setActiveTimelineIndex(idx); setIsPlaying(false); }}
-                className={`px-3 h-7 rounded-xl text-[11px] font-semibold transition-all duration-200 ${
+                className={`px-2.5 sm:px-3 h-6 sm:h-7 rounded-xl text-[10px] sm:text-[11px] font-semibold transition-all duration-200 whitespace-nowrap ${
                   idx === activeTimelineIndex
                     ? 'bg-brand-500 text-white shadow-sm shadow-brand-200'
                     : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'

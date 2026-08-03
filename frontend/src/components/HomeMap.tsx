@@ -23,13 +23,23 @@ const fillLayer: any = {
   }
 };
 
+const lineLayerCasing: any = {
+  id: 'home-regions-line-casing',
+  type: 'line',
+  paint: {
+    'line-color': '#ffffff',
+    'line-opacity': 0.7,
+    'line-width': 2.0
+  }
+};
+
 const lineLayer: any = {
   id: 'home-regions-line',
   type: 'line',
   paint: {
-    'line-color': '#ffffff',
-    'line-opacity': 0.6,
-    'line-width': 1
+    'line-color': '#1e293b',
+    'line-opacity': 0.85,
+    'line-width': 1.0
   }
 };
 
@@ -72,6 +82,7 @@ export default function HomeMap() {
         try {
           map.addSource('ghana-home', { type: 'geojson', data: geoData });
           map.addLayer(fillLayer);
+          map.addLayer(lineLayerCasing);
           map.addLayer(lineLayer);
         } catch (err) {
           console.warn('Failed to add source/layer:', err);
