@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
-import { Search, ChevronDown, X, SlidersHorizontal, Filter } from 'lucide-react';
+import { Search, ChevronDown, X, SlidersHorizontal, Filter, Menu, Home, BarChart3, TrendingUp, Layers, HelpCircle, Info, Scale } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import logo from '@/assets/logo.png';
 import { fetchAvailableFilters } from '@/lib/api';
 import { VALID_REGIONAL_YEARS, DEFAULT_YEAR } from '@/lib/constants';
@@ -82,6 +83,7 @@ function FilterSelect({
 }
 
 export default function TopBar() {
+  const pathname = usePathname();
   const { year, gas, sector, isDistrictViewActive, setYear, setGas, setSector, setSearchedRegion } = useStore();
   const [availableYears, setAvailableYears] = useState<number[]>(YEARS);
   const [availableGases, setAvailableGases] = useState<string[]>(GASES);
@@ -89,6 +91,8 @@ export default function TopBar() {
   const [search, setSearch] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   const filteredRegions = REGIONS.filter(r => r.toLowerCase().includes(search.toLowerCase()));
 
@@ -119,213 +123,276 @@ export default function TopBar() {
     setSector(null);
   }
 
+  const NAV_ITEMS = [
+    { label: 'Home', href: '/', icon: Home },
+    { label: 'Track Emissions (Map)', href: '/dashboard', icon: BarChart3 },
+    { label: 'Emissions Forecasts', href: '/forecasts', icon: TrendingUp },
+    { label: 'Comparison Tool', href: '/compare', icon: Scale },
+  ];
+
   return (
     <>
-      {/* Top Floating Bar */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[calc(100%-24px)] md:w-[calc(100%-104px)] max-w-5xl flex items-center justify-between md:justify-start gap-2.5 px-3.5 md:px-4 py-2 md:py-2.5 bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 z-20">
-        {/* Logo */}
-        <div className="flex-shrink-0 flex items-center gap-2">
-          <Link href="/">
-            <Image src={logo} alt="NCEL" className="h-6 md:h-7 w-auto" />
-          </Link>
-        </div>
+      {/* Top Floating Container */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[calc(100%-24px)] md:w-[calc(100%-104px)] max-w-5xl z-20 space-y-2">
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between md:justify-start gap-2.5 px-3.5 md:px-4 py-2 md:py-2.5 bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100">
+          {/* Hamburger Menu & Logo Container */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {/* Hamburger Icon Button to the left of Logo */}
+            <div className="relative">
+              <button
+                onClick={() => setIsNavMenuOpen(!isNavMenuOpen)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-700 transition-colors flex items-center justify-center active:scale-95"
+                aria-label="Toggle navigation menu"
+              >
+                {isNavMenuOpen ? <X className="w-5 h-5 text-gray-800" /> : <Menu className="w-5 h-5 text-gray-700" />}
+              </button>
 
-        <div className="hidden md:block w-px h-5 bg-gray-200 flex-shrink-0" />
+              {/* Navigation Menu Dropdown (White Theme) */}
+              <AnimatePresence>
+                {isNavMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-[90]"
+                      onClick={() => setIsNavMenuOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
+                      className="absolute top-full left-0 mt-3 w-64 bg-white/98 backdrop-blur-xl text-gray-900 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.14)] border border-gray-100 p-2 z-[100] overflow-hidden"
+                    >
+                      <div className="px-3 py-2 border-b border-gray-100 mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Menu</span>
+                      </div>
 
-        {/* Filters label - Desktop */}
-        <div className="hidden md:flex flex-shrink-0 items-center gap-1.5 text-xs text-gray-400 font-medium">
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span className="hidden lg:block">Filters</span>
-          {activeCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-[#00C853] text-white text-[10px] font-bold flex items-center justify-center">
-              {activeCount}
-            </span>
-          )}
-        </div>
+                      <div className="space-y-1">
+                        {NAV_ITEMS.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = pathname === item.href;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsNavMenuOpen(false)}
+                              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                                isActive
+                                  ? 'bg-[#00C853] text-white shadow-sm shadow-emerald-200'
+                                  : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                              }`}
+                            >
+                              <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                              <span>{item.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
 
-        {/* Filter selects - Desktop */}
-        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <FilterSelect
-            label="Year"
-            value={year ?? DEFAULT_YEAR}
-            options={YEARS}
-            available={availableYears}
-            onChange={v => setYear(v ? parseInt(v) : DEFAULT_YEAR)}
-          />
-          <FilterSelect
-            label="Gas Type"
-            value={gas}
-            options={GASES}
-            available={availableGases}
-            onChange={setGas}
-            disabled={isDistrictViewActive}
-            tooltip="Gas breakdown is displayed inside the district popup"
-          />
-          <FilterSelect
-            label="Sector"
-            value={sector}
-            options={SECTORS}
-            available={availableSectors}
-            onChange={setSector}
-            disabled={isDistrictViewActive}
-            tooltip="Sector breakdown is displayed inside the district popup"
-          />
-
-          {activeCount > 0 && (
-            <button
-              onClick={clearAll}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2 py-2 rounded-lg hover:bg-gray-50"
-              title="Clear all filters"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span className="hidden xl:block">Clear</span>
-            </button>
-          )}
-        </div>
-
-        {/* Active filter badges - Desktop */}
-        {(gas || sector) && (
-          <div className="hidden lg:flex items-center gap-1.5 flex-1 overflow-hidden">
-            <div className="w-px h-5 bg-gray-200 mr-1" />
-            {gas && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${GAS_COLORS[gas] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                {gas}
-                <button onClick={() => setGas(null)} className="opacity-60 hover:opacity-100"><X className="w-2.5 h-2.5" /></button>
-              </span>
-            )}
-            {sector && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${SECTOR_COLORS[sector] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                {sector}
-                <button onClick={() => setSector(null)} className="opacity-60 hover:opacity-100"><X className="w-2.5 h-2.5" /></button>
-              </span>
-            )}
+            <Link href="/" className="flex items-center">
+              <Image src={logo} alt="NCEL" className="h-6 md:h-7 w-auto" />
+            </Link>
           </div>
-        )}
 
-        {/* Desktop Search */}
-        <div className="flex-1 hidden md:flex justify-end">
-          <div className="relative max-w-[180px] lg:max-w-[200px] w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5 pointer-events-none z-10" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => {
-                setSearch(e.target.value);
-                setShowSearchDropdown(true);
-              }}
-              onFocus={() => setShowSearchDropdown(true)}
-              onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
-              placeholder="Search regions..."
-              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-transparent bg-gray-50 placeholder-gray-300 transition-all relative z-10"
-            />
-            {showSearchDropdown && search && filteredRegions.length > 0 && (
-              <div className="absolute top-full mt-1.5 w-full bg-white border border-gray-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-xl overflow-hidden z-[100] max-h-60 overflow-y-auto">
-                {filteredRegions.map(r => (
-                  <button
-                    key={r}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setSearch(r);
-                      setSearchedRegion(r);
-                      setShowSearchDropdown(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-brand-600 transition-colors"
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+          <div className="hidden md:block w-px h-5 bg-gray-200 flex-shrink-0" />
 
-        {/* Mobile Buttons (Filter Drawer Trigger & Quick Search) */}
-        <div className="flex md:hidden items-center gap-2">
-          <button
-            onClick={() => setIsMobileDrawerOpen(true)}
-            className="flex items-center gap-1.5 bg-[#00C853] text-white px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm active:scale-95 transition-transform"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filter</span>
+          {/* Filters label - Desktop */}
+          <div className="hidden md:flex flex-shrink-0 items-center gap-1.5 text-xs text-gray-400 font-medium">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span className="hidden lg:block">Filters</span>
             {activeCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-white text-[#00C853] text-[10px] font-bold flex items-center justify-center">
+              <span className="w-4 h-4 rounded-full bg-[#00C853] text-white text-[10px] font-bold flex items-center justify-center">
                 {activeCount}
               </span>
             )}
-          </button>
-        </div>
-      </div>
+          </div>
 
-      {/* Mobile Slide-Up Filter Drawer */}
-      <AnimatePresence>
-        {isMobileDrawerOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-            onClick={() => setIsMobileDrawerOpen(false)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              onClick={e => e.stopPropagation()}
-              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+          {/* Filter selects - Desktop */}
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+            <FilterSelect
+              label="Year"
+              value={year ?? DEFAULT_YEAR}
+              options={YEARS}
+              available={availableYears}
+              onChange={v => setYear(v ? parseInt(v) : DEFAULT_YEAR)}
+            />
+            <FilterSelect
+              label="Gas Type"
+              value={gas}
+              options={GASES}
+              available={availableGases}
+              onChange={setGas}
+              disabled={isDistrictViewActive}
+              tooltip="Gas breakdown is displayed inside the district popup"
+            />
+            <FilterSelect
+              label="Sector"
+              value={sector}
+              options={SECTORS}
+              available={availableSectors}
+              onChange={setSector}
+              disabled={isDistrictViewActive}
+              tooltip="Sector breakdown is displayed inside the district popup"
+            />
+
+            {activeCount > 0 && (
+              <button
+                onClick={clearAll}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors px-2 py-2 rounded-lg hover:bg-gray-50"
+                title="Clear all filters"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span className="hidden xl:block">Clear</span>
+              </button>
+            )}
+          </div>
+
+          {/* Active filter badges - Desktop */}
+          {(gas || sector) && (
+            <div className="hidden lg:flex items-center gap-1.5 flex-1 overflow-hidden">
+              <div className="w-px h-5 bg-gray-200 mr-1" />
+              {gas && (
+                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${GAS_COLORS[gas] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                  {gas}
+                  <button onClick={() => setGas(null)} className="opacity-60 hover:opacity-100"><X className="w-2.5 h-2.5" /></button>
+                </span>
+              )}
+              {sector && (
+                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${SECTOR_COLORS[sector] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                  {sector}
+                  <button onClick={() => setSector(null)} className="opacity-60 hover:opacity-100"><X className="w-2.5 h-2.5" /></button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Desktop Search */}
+          <div className="flex-1 hidden md:flex justify-end">
+            <div className="relative max-w-[180px] lg:max-w-[200px] w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 w-3.5 h-3.5 pointer-events-none z-10" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => {
+                  setSearch(e.target.value);
+                  setShowSearchDropdown(true);
+                }}
+                onFocus={() => setShowSearchDropdown(true)}
+                onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+                placeholder="Search regions..."
+                className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-transparent bg-gray-50 placeholder-gray-300 transition-all relative z-10"
+              />
+              {showSearchDropdown && search && filteredRegions.length > 0 && (
+                <div className="absolute top-full mt-1.5 w-full bg-white border border-gray-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-xl overflow-hidden z-[100] max-h-60 overflow-y-auto">
+                  {filteredRegions.map(r => (
+                    <button
+                      key={r}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearch(r);
+                        setSearchedRegion(r);
+                        setShowSearchDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-brand-600 transition-colors"
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Right Controls: Toggle Filter Stack Icon Button */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 ${
+                isMobileFiltersOpen
+                  ? 'bg-[#00C853] text-white shadow-emerald-200'
+                  : 'bg-gray-100/90 text-gray-700 hover:bg-gray-200 border border-gray-200'
+              }`}
+              title="Toggle Map Filters"
             >
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Filter className="w-4 h-4" />
+              <Filter className="w-4 h-4" />
+              {activeCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-white text-[#00C853] text-[10px] font-bold flex items-center justify-center">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Climate TRACE Inspired Mobile Filters Card Stacked Directly Beneath Top Bar (Toggleable) */}
+        <AnimatePresence>
+          {isMobileFiltersOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="md:hidden bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.14)] border border-gray-100 p-3 space-y-2"
+            >
+              {/* Search input (Climate TRACE style) */}
+              <div className="relative w-full">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5 pointer-events-none z-10" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => {
+                    setSearch(e.target.value);
+                    setShowSearchDropdown(true);
+                  }}
+                  onFocus={() => setShowSearchDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+                  placeholder="Enter a geographic area or region name."
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/50 bg-gray-50/90 text-gray-800 placeholder-gray-400 font-medium"
+                />
+                {showSearchDropdown && search && filteredRegions.length > 0 && (
+                  <div className="absolute top-full mt-1.5 w-full bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden z-[100] max-h-48 overflow-y-auto divide-y divide-gray-100">
+                    {filteredRegions.map(r => (
+                      <button
+                        key={r}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSearch(r);
+                          setSearchedRegion(r);
+                          setShowSearchDropdown(false);
+                          setIsMobileFiltersOpen(false);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                      >
+                        📍 {r}
+                      </button>
+                    ))}
                   </div>
-                  <h3 className="text-base font-bold text-gray-800">Map Filters & Search</h3>
-                </div>
-                <button
-                  onClick={() => setIsMobileDrawerOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                )}
               </div>
 
-              {/* Region Search Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Search Region</label>
-                <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Find region in Ghana..."
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400/50 bg-gray-50"
-                  />
-                  {search && filteredRegions.length > 0 && (
-                    <div className="mt-2 bg-gray-50 border border-gray-100 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-100">
-                      {filteredRegions.map(r => (
-                        <button
-                          key={r}
-                          onClick={() => {
-                            setSearchedRegion(r);
-                            setIsMobileDrawerOpen(false);
-                          }}
-                          className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700"
-                        >
-                          📍 {r}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {/* Sector Select */}
+              <div>
+                <FilterSelect
+                  label="Sectors"
+                  value={sector}
+                  options={SECTORS}
+                  available={availableSectors}
+                  onChange={setSector}
+                  disabled={isDistrictViewActive}
+                  fullWidth
+                />
               </div>
 
-              {/* Selectors */}
-              <div className="space-y-3 pt-2">
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Emissions Year</label>
+              {/* Year & Gas selects row */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
                   <FilterSelect
-                    label="Select Year"
+                    label="Year"
                     value={year ?? DEFAULT_YEAR}
                     options={YEARS}
                     available={availableYears}
@@ -333,58 +400,30 @@ export default function TopBar() {
                     fullWidth
                   />
                 </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Gas Type</label>
+                <div className="flex-1">
                   <FilterSelect
-                    label="All Gases (Total)"
+                    label="Gas Type"
                     value={gas}
                     options={GASES}
                     available={availableGases}
                     onChange={setGas}
                     disabled={isDistrictViewActive}
-                    tooltip="Gas breakdown is displayed inside the district popup"
                     fullWidth
                   />
                 </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Sector</label>
-                  <FilterSelect
-                    label="All Sectors"
-                    value={sector}
-                    options={SECTORS}
-                    available={availableSectors}
-                    onChange={setSector}
-                    disabled={isDistrictViewActive}
-                    tooltip="Sector breakdown is displayed inside the district popup"
-                    fullWidth
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
-                {activeCount > 0 ? (
+                {activeCount > 0 && (
                   <button
-                    onClick={() => { clearAll(); }}
-                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50"
+                    onClick={clearAll}
+                    className="px-2.5 py-2 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl hover:bg-rose-100 transition-colors flex-shrink-0"
                   >
-                    Reset Filters
+                    Clear
                   </button>
-                ) : <div />}
-
-                <button
-                  onClick={() => setIsMobileDrawerOpen(false)}
-                  className="flex-1 py-2.5 bg-[#00C853] hover:bg-[#009624] text-white text-xs font-bold rounded-xl shadow-sm text-center"
-                >
-                  Apply Filters ({activeCount})
-                </button>
+                )}
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
     </>
   );
 }

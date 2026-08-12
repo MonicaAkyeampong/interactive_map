@@ -97,6 +97,9 @@ function getComputedColor(val: number, bps: number[]) {
   return '#d73027';                    // Extreme Hotspot
 }
 
+const MIN_ZOOM = 4.8;
+const MAX_ZOOM = 18;
+
 export default function Map() {
   const mapRef = useRef<MapRef>(null);
 
@@ -188,6 +191,13 @@ export default function Map() {
     latitude: 7.9465,
     zoom: 6.5,
   });
+
+  // Adjust initial map zoom for mobile view so full map of Ghana fits without clipping
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewState(prev => ({ ...prev, zoom: 5.1 }));
+    }
+  }, []);
 
   useEffect(() => {
     let id: NodeJS.Timeout;
@@ -450,7 +460,10 @@ export default function Map() {
       <MapboxMap
         ref={mapRef}
         {...viewState}
-        onMove={evt => setViewState(evt.viewState)}
+        onMove={evt => setViewState({
+          ...evt.viewState,
+          zoom: Math.max(evt.viewState.zoom, MIN_ZOOM)
+        })}
         onClick={onClick}
         interactiveLayerIds={['regions-fill', 'districts-fill']}
         cursor="pointer"
@@ -459,7 +472,13 @@ export default function Map() {
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
         maxBounds={[[-9.0, 1.0], [7.0, 15.0]]}
-        minZoom={6.2}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
+        scrollZoom={true}
+        dragPan={true}
+        doubleClickZoom={true}
+        cooperativeGestures={false}
+        reuseMaps
       >
         {geoData && (
           <Source id="ghana-regions" type="geojson" data={geoData}>
@@ -639,38 +658,52 @@ export default function Map() {
         )}
       </AnimatePresence>
 
-      {/* ── Zoom Controls ── */}
-      <div className="absolute right-3 md:right-6 top-16 md:top-auto md:bottom-6 flex flex-col gap-1.5 z-10">
-        <button
-          onClick={() => setViewState(p => ({ ...p, zoom: Math.min(p.zoom + 1, 18) }))}
-          className="w-8 h-8 md:w-9 md:h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setViewState(p => ({ ...p, zoom: Math.max(p.zoom - 1, 1) }))}
-          className="w-8 h-8 md:w-9 md:h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all"
-        >
-          <Minus className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* ── Legend Container ── */}
-      <div className="absolute bottom-16 md:bottom-6 right-3 md:right-20 z-10 flex items-end gap-2 md:gap-3">
+      {/* ── Bottom Right Control Stack (Zoom Controls + Legend & Help) ── */}
+      <div className="absolute bottom-3 md:bottom-6 right-3 md:right-6 z-10 flex flex-col items-end gap-2 md:gap-2.5 pointer-events-none">
         
-        {/* How to Use Button */}
+        {/* Zoom Controls (Positioned directly above Legend/Help) */}
+        <div className="flex flex-col gap-1.5 pointer-events-auto">
+          <button
+            onClick={() => setViewState(p => ({ ...p, zoom: Math.min(p.zoom + 1, MAX_ZOOM) }))}
+            className="w-8 h-8 md:w-9 md:h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95"
+            title="Zoom in"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewState(p => ({ ...p, zoom: Math.max(p.zoom - 1, MIN_ZOOM) }))}
+            className="w-8 h-8 md:w-9 md:h-9 bg-white/97 backdrop-blur-sm text-gray-700 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95"
+            title="Zoom out"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Legend Container & Help Controls */}
+        <div className="flex items-end gap-2 md:gap-3 pointer-events-auto">
+          
+          {/* How to Use Button */}
+          <button
+            onClick={() => setIsHowToOpen(true)}
+            className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 p-2.5 md:p-3 hover:bg-gray-50/80 transition-colors flex items-center justify-center h-9 md:h-11"
+            title="How to use the map"
+          >
+            <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 hover:text-brand-600 transition-colors" />
+          </button>
+
+        {/* Legend Button - Mobile Icon-Only */}
         <button
-          onClick={() => setIsHowToOpen(true)}
-          className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 p-2.5 md:p-3 hover:bg-gray-50/80 transition-colors flex items-center justify-center h-9 md:h-11"
-          title="How to use the map"
+          onClick={() => setIsLegendOpen(!isLegendOpen)}
+          className="md:hidden bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 p-2.5 hover:bg-gray-50/80 transition-colors flex items-center justify-center h-9 w-9"
+          title="Map Legend"
         >
-          <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 hover:text-brand-600 transition-colors" />
+          <Layers className="w-4 h-4 text-gray-700" />
         </button>
 
-        {/* Legend */}
-        <div className="bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 overflow-hidden min-w-[170px] sm:min-w-[200px]">
+        {/* Legend Container - Popover on Mobile, Card on Desktop */}
+        <div className={`bg-white/97 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.13)] border border-gray-100 overflow-hidden ${isLegendOpen ? 'block' : 'hidden md:block'} min-w-[170px] sm:min-w-[200px]`}>
           <button
-            className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50/80 transition-colors border-b border-gray-50 h-9 sm:h-11"
+            className="hidden md:flex w-full px-3 sm:px-4 py-2 sm:py-3 items-center justify-between hover:bg-gray-50/80 transition-colors border-b border-gray-50 h-9 sm:h-11"
             onClick={() => setIsLegendOpen(!isLegendOpen)}
           >
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -681,11 +714,14 @@ export default function Map() {
           </button>
 
           {isLegendOpen && (
-            <div>
+            <div className="block">
               <div className="px-3 sm:px-4 py-2.5 sm:py-3">
-                <p className="text-[10px] text-gray-400 font-medium mb-2.5 uppercase tracking-wider">
-                  {gas ? `${gas} Emission Level` : 'Total Emission Level'}
-                </p>
+                <div className="flex items-center justify-between md:block mb-2.5">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                    {gas ? `${gas} Emission Level` : 'Total Emission Level'}
+                  </p>
+                  <button onClick={() => setIsLegendOpen(false)} className="md:hidden text-gray-400 text-xs font-bold px-1">✕</button>
+                </div>
                 <div className="flex flex-col gap-1.5 sm:gap-2">
                   {(() => {
                     const isPerCapita = false; // Toggle left out for now
@@ -749,9 +785,10 @@ export default function Map() {
           )}
         </div>
       </div>
+    </div>
 
-      {/* ── Timeline ── */}
-      <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-24px)] sm:w-auto max-w-lg">
+      {/* ── Timeline (Hidden on Mobile) ── */}
+      <div className="hidden md:block absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-24px)] sm:w-auto max-w-lg">
         <div className="flex items-center gap-1.5 sm:gap-2 bg-white/97 backdrop-blur-xl px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 overflow-x-auto no-scrollbar">
           {/* Play/Pause */}
           <button

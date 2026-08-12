@@ -8,7 +8,8 @@
       const map = L.map("map", {
         maxBounds: bounds,
         maxBoundsViscosity: 1.0, // Prevents users from dragging outside bounds
-        minZoom: 6.2
+        minZoom: 6.2,
+        scrollWheelZoom: true
       }).setView([7.9465, -1.0232], 6.5);
 
       // Add base map

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import MapboxMap, { MapRef } from 'react-map-gl/mapbox';
+import MapboxMap, { Source, Layer, MapRef } from 'react-map-gl/mapbox';
 import { motion } from 'framer-motion';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -57,7 +57,7 @@ export default function HomeMap() {
   const onMapLoad = useCallback(() => {
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
-    const style = map.getStyle();
+    const style = map?.getStyle();
     if (style?.layers) {
       style.layers.forEach(layer => {
         if (
@@ -67,34 +67,13 @@ export default function HomeMap() {
           layer.id.includes('place-') ||
           layer.id.includes('poi-')
         ) {
-          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          try {
+            map.setLayoutProperty(layer.id, 'visibility', 'none');
+          } catch {}
         }
       });
     }
   }, []);
-
-  useEffect(() => {
-    if (!mapRef.current || !geoData) return;
-    const map = mapRef.current.getMap();
-    
-    if (map.isStyleLoaded()) {
-      if (!map.getSource('ghana-home')) {
-        try {
-          map.addSource('ghana-home', { type: 'geojson', data: geoData });
-          map.addLayer(fillLayer);
-          map.addLayer(lineLayerCasing);
-          map.addLayer(lineLayer);
-        } catch (err) {
-          console.warn('Failed to add source/layer:', err);
-        }
-      } else {
-        const source = map.getSource('ghana-home') as any;
-        if (source && source.setData) {
-          source.setData(geoData);
-        }
-      }
-    }
-  }, [geoData]);
 
   return (
     <motion.div
@@ -134,9 +113,18 @@ export default function HomeMap() {
           interactive={false}
           attributionControl={false}
           maxBounds={[[-9.0, 1.0], [7.0, 15.0]]}
-          minZoom={6.2}
+          minZoom={4.8}
           onLoad={onMapLoad}
-        />
+          reuseMaps
+        >
+          {geoData && (
+            <Source id="ghana-home" type="geojson" data={geoData}>
+              <Layer {...fillLayer} />
+              <Layer {...lineLayerCasing} />
+              <Layer {...lineLayer} />
+            </Source>
+          )}
+        </MapboxMap>
       )}
     </motion.div>
   );

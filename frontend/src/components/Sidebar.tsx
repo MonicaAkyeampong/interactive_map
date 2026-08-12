@@ -209,55 +209,6 @@ export default function Sidebar() {
       >
         {renderStatsContent()}
       </motion.div>
-
-      {/* Mobile Overview Pill Trigger */}
-      <div className="md:hidden absolute top-16 left-3 z-20">
-        <button
-          onClick={() => setIsMobileSheetOpen(true)}
-          className="flex items-center gap-2 bg-white/95 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-gray-100 text-xs font-bold text-gray-800 active:scale-95 transition-transform"
-        >
-          <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
-          <span>{loading ? 'Overview' : `${formatted} ${displayUnit}`}</span>
-          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-        </button>
-      </div>
-
-      {/* Mobile Stats Bottom Sheet Drawer */}
-      <AnimatePresence>
-        {isMobileSheetOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-end justify-center p-0 md:hidden"
-            onClick={() => setIsMobileSheetOpen(false)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              onClick={e => e.stopPropagation()}
-              className="bg-white w-full rounded-t-3xl shadow-2xl p-4 max-h-[85vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-emerald-600" />
-                  <h3 className="text-sm font-bold text-gray-800">Emissions Overview</h3>
-                </div>
-                <button
-                  onClick={() => setIsMobileSheetOpen(false)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {renderStatsContent()}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }
